@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI对话', icon: 'chat' },
       },
       {
+        path: 'knowledge-base',
+        name: 'KnowledgeBase',
+        component: () => import('@/views/knowledge-base/index.vue'),
+        meta: { title: '知识库管理', icon: 'book' },
+      },
+      {
         path: 'token-stats',
         name: 'TokenStats',
         component: () => import('@/views/token-stats/index.vue'),

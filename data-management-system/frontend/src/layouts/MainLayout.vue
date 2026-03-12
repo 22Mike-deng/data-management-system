@@ -16,6 +16,7 @@ import {
   LineChart,
   Menu as MenuIcon,
   X,
+  BookOpen,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -29,6 +30,7 @@ const menuItems = [
   { key: '/visualization', title: '数据可视化', icon: BarChart3 },
   { key: '/ai-model', title: 'AI模型管理', icon: Bot },
   { key: '/ai-chat', title: 'AI对话', icon: MessageSquare },
+  { key: '/knowledge-base', title: '知识库管理', icon: BookOpen },
   { key: '/token-stats', title: 'Token统计', icon: LineChart },
 ]
 

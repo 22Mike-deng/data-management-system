@@ -14,6 +14,7 @@ import { DynamicDataModule } from './modules/dynamic-data';
 import { AIModelModule } from './modules/ai-model';
 import { TokenUsageModule } from './modules/token-usage';
 import { ViewConfigModule } from './modules/view-config';
+import { KnowledgeBaseModule } from './modules/knowledge-base';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ViewConfigModule } from './modules/view-config';
     AIModelModule,
     TokenUsageModule,
     ViewConfigModule,
+    KnowledgeBaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

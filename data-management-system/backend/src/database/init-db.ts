@@ -156,6 +156,26 @@ async function initDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (model_id) REFERENCES sys_ai_model(model_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+      },
+      // 知识库表
+      {
+        name: 'sys_knowledge_base',
+        sql: `CREATE TABLE IF NOT EXISTS sys_knowledge_base (
+          knowledge_id VARCHAR(36) PRIMARY KEY,
+          title VARCHAR(200) NOT NULL,
+          content TEXT NOT NULL,
+          category VARCHAR(50),
+          tags JSON,
+          source VARCHAR(100),
+          priority INT DEFAULT 0,
+          is_enabled TINYINT(1) DEFAULT 1,
+          view_count INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_knowledge_category (category),
+          INDEX idx_knowledge_priority (priority),
+          FULLTEXT INDEX ft_knowledge_content (title, content)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
       }
     ];
 

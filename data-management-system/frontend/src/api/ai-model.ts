@@ -54,11 +54,20 @@ export function testConnection(data: TestConnectionDto): Promise<ApiResponse<Tes
   return request.post('/ai/models/test-connection', data)
 }
 
+// 通过模型ID测试连接（使用已保存的配置）
+export function testConnectionById(modelId: string): Promise<ApiResponse<TestConnectionResult>> {
+  return request.post(`/ai/models/${modelId}/test-connection`)
+}
+
 // ==================== AI对话 ====================
 
-// 发送消息
-export function sendMessage(data: SendMessageDto): Promise<ApiResponse<SendMessageResult>> {
-  return request.post('/ai/chat/send', data)
+// 发送消息（AI对话可能涉及多轮工具调用，设置更长超时时间）
+// 支持通过 signal 取消请求
+export function sendMessage(data: SendMessageDto, signal?: AbortSignal): Promise<ApiResponse<SendMessageResult>> {
+  return request.post('/ai/chat/send', data, { 
+    timeout: 120000, // 2分钟超时
+    signal, // 支持取消请求
+  })
 }
 
 // 获取对话历史
@@ -121,6 +130,7 @@ export interface SendMessageDto {
   modelId?: string
   content: string
   sessionId?: string
+  useKnowledgeBase?: boolean
 }
 
 export interface SendMessageResult {

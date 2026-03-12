@@ -148,6 +148,21 @@ export interface ApiResponse<T = unknown> {
   data: T
 }
 
+// 知识库类型
+export interface KnowledgeBase {
+  knowledgeId: string
+  title: string
+  content: string
+  category?: string
+  tags?: string[]
+  source?: string
+  priority: number
+  isEnabled: boolean
+  viewCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 // 分页参数
 export interface PaginationParams {
   page: number

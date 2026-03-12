@@ -6,6 +6,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { KnowledgeBaseService } from '../knowledge-base';
 
 // 工具定义接口
 export interface ToolDefinition {
@@ -35,13 +36,17 @@ export interface ToolCallResult {
 
 @Injectable()
 export class AIToolsService {
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private dataSource: DataSource,
+    private knowledgeBaseService: KnowledgeBaseService,
+  ) {}
 
   /**
    * 获取所有可用工具定义
+   * @param includeKnowledge 是否包含知识库工具
    */
-  getToolDefinitions(): ToolDefinition[] {
-    return [
+  getToolDefinitions(includeKnowledge: boolean = false): ToolDefinition[] {
+    const baseTools: ToolDefinition[] = [
       {
         type: 'function',
         function: {
@@ -178,6 +183,36 @@ export class AIToolsService {
         },
       },
     ];
+
+    // 知识库查询工具（可选）
+    const knowledgeTool: ToolDefinition = {
+      type: 'function',
+      function: {
+        name: 'search_knowledge',
+        description: '搜索系统知识库，查找与用户问题相关的知识内容。当用户询问业务规则、操作指南、系统说明等问题时，应该先调用此工具查询相关知识。',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: '搜索关键词或问题，可以是多个关键词',
+            },
+            limit: {
+              type: 'number',
+              description: '返回结果数量限制，默认为3',
+            },
+          },
+          required: ['query'],
+        },
+      },
+    };
+
+    // 只有开启知识库时才添加知识库工具
+    if (includeKnowledge) {
+      baseTools.push(knowledgeTool);
+    }
+
+    return baseTools;
   }
 
   /**
@@ -208,6 +243,9 @@ export class AIToolsService {
           break;
         case 'group_by_field':
           result = await this.groupByField(args);
+          break;
+        case 'search_knowledge':
+          result = await this.searchKnowledge(args.query, args.limit);
           break;
         default:
           throw new Error(`未知的工具: ${fn.name}`);
@@ -425,7 +463,13 @@ export class AIToolsService {
     `, [fullTableName, field]);
 
     if (fieldInfo.length === 0) {
-      throw new Error(`字段 ${field} 不存在`);
+      // 获取可用字段列表
+      const availableFields = await this.dataSource.query(`
+        SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+      `, [fullTableName]);
+      const fieldNames = availableFields.map((f: any) => `${f.COLUMN_NAME}(${f.DATA_TYPE})`).join(', ');
+      throw new Error(`字段 "${field}" 不存在。可用字段: ${fieldNames}`);
     }
 
     const numericTypes = ['int', 'bigint', 'float', 'double', 'decimal', 'tinyint', 'smallint', 'mediumint'];
@@ -471,6 +515,22 @@ export class AIToolsService {
       throw new Error(`表 ${tableName} 不存在`);
     }
 
+    // 检查字段是否存在
+    const fieldInfo = await this.dataSource.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+    `, [fullTableName, field]);
+
+    if (fieldInfo.length === 0) {
+      // 获取可用字段列表
+      const availableFields = await this.dataSource.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+      `, [fullTableName]);
+      const fieldNames = availableFields.map((f: any) => f.COLUMN_NAME).join(', ');
+      throw new Error(`字段 "${field}" 不存在。可用字段: ${fieldNames}`);
+    }
+
     const result = await this.dataSource.query(
       `SELECT ?? as value, COUNT(*) as count FROM ?? GROUP BY ?? ORDER BY count DESC LIMIT ?`,
       [field, fullTableName, field, limit]
@@ -480,6 +540,25 @@ export class AIToolsService {
       tableName,
       field,
       groups: result,
+    };
+  }
+
+  /**
+   * 搜索知识库
+   */
+  private async searchKnowledge(query: string, limit: number = 3): Promise<any> {
+    const results = await this.knowledgeBaseService.searchForAI(query, limit);
+    
+    return {
+      query,
+      count: results.length,
+      results: results.map(r => ({
+        title: r.title,
+        content: r.content,
+        category: r.category,
+        tags: r.tags,
+        source: r.source,
+      })),
     };
   }
 }

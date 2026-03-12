@@ -137,24 +137,101 @@ export class AIModelService {
   /**
    * 测试模型连接
    */
-  async testConnection(dto: TestConnectionDto): Promise<{ success: boolean; message: string }> {
+  async testConnection(dto: TestConnectionDto): Promise<{ success: boolean; message: string; responseTime?: number }> {
+    const startTime = Date.now();
     try {
-      // TODO: 实际调用AI API测试连接
-      // 这里简化处理，实际应该调用 LangChain 进行测试
-      const response = await fetch(`${dto.apiEndpoint}/models`, {
+      // 尝试获取模型列表来验证API Key（某些API不支持此端点）
+      const modelsResponse = await fetch(`${dto.apiEndpoint}/models`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${dto.apiKey}`,
         },
       });
 
-      if (response.ok) {
-        return { success: true, message: '连接测试成功' };
-      } else {
-        return { success: false, message: `连接失败: ${response.statusText}` };
+      const responseTime = Date.now() - startTime;
+
+      if (modelsResponse.ok) {
+        return { success: true, message: 'API连接测试成功', responseTime };
       }
-    } catch (error) {
-      return { success: false, message: `连接失败: ${error.message}` };
+
+      // 如果 /models 端点不可用，尝试发送一个最小化请求来测试
+      if (modelsResponse.status === 404 || modelsResponse.status === 405) {
+        return await this.testConnectionByChat(dto, startTime);
+      }
+
+      const errorData = await modelsResponse.json().catch(() => ({}));
+      return {
+        success: false,
+        message: errorData.error?.message || `连接失败: ${modelsResponse.status} ${modelsResponse.statusText}`,
+        responseTime,
+      };
+    } catch (error: any) {
+      // 网络错误时尝试聊天接口测试
+      return await this.testConnectionByChat(dto, startTime);
     }
+  }
+
+  /**
+   * 通过发送最小聊天请求测试连接
+   */
+  private async testConnectionByChat(
+    dto: TestConnectionDto, 
+    startTime: number
+  ): Promise<{ success: boolean; message: string; responseTime?: number }> {
+    try {
+      const response = await fetch(`${dto.apiEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${dto.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: dto.modelIdentifier,
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 5,
+        }),
+      });
+
+      const responseTime = Date.now() - startTime;
+
+      if (response.ok) {
+        return { success: true, message: 'API连接测试成功', responseTime };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      
+      // 如果是模型不存在的错误，但API Key有效
+      if (response.status === 400 || response.status === 404) {
+        const errorMsg = errorData.error?.message || '';
+        if (errorMsg.includes('model') || errorMsg.includes('Model')) {
+          return { 
+            success: true, 
+            message: 'API Key有效，但模型标识符可能不正确', 
+            responseTime 
+          };
+        }
+      }
+
+      return {
+        success: false,
+        message: errorData.error?.message || `连接失败: ${response.status}`,
+        responseTime,
+      };
+    } catch (error: any) {
+      return { success: false, message: `连接失败: ${error.message}`, responseTime: Date.now() - startTime };
+    }
+  }
+
+  /**
+   * 通过模型ID测试连接（使用已保存的配置）
+   */
+  async testConnectionById(modelId: string): Promise<{ success: boolean; message: string; responseTime?: number }> {
+    const model = await this.findById(modelId);
+    return this.testConnection({
+      apiEndpoint: model.apiEndpoint,
+      apiKey: model.apiKey,
+      modelIdentifier: model.modelIdentifier,
+    });
   }
 
   /**

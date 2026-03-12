@@ -11,3 +11,4 @@ export { AIChatHistory } from './ai-chat-history.entity';
 export { TokenUsage } from './token-usage.entity';
 export { AIModelPricing } from './ai-model-pricing.entity';
 export { ViewConfig } from './view-config.entity';
+export { KnowledgeBase } from './knowledge-base.entity';

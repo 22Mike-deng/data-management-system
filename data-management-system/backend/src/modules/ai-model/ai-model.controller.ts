@@ -2,7 +2,7 @@
  * AI模型管理控制器
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { AIModelService } from './ai-model.service';
@@ -47,20 +47,6 @@ export class AIModelController {
   }
 
   /**
-   * 获取模型详情
-   * GET /api/ai/models/:modelId
-   */
-  @Get('models/:modelId')
-  async findModelById(@Param('modelId') modelId: string) {
-    const model = await this.modelService.findById(modelId);
-    return {
-      code: 0,
-      message: 'success',
-      data: model,
-    };
-  }
-
-  /**
    * 创建模型
    * POST /api/ai/models
    */
@@ -70,6 +56,35 @@ export class AIModelController {
     return {
       code: 0,
       message: '创建成功',
+      data: model,
+    };
+  }
+
+  /**
+   * 测试模型连接（使用表单数据）
+   * POST /api/ai/models/test-connection
+   * 注意：此路由必须在 models/:modelId 相关路由之前定义
+   */
+  @Post('models/test-connection')
+  async testConnection(@Body() dto: TestConnectionDto) {
+    const result = await this.modelService.testConnection(dto);
+    return {
+      code: result.success ? 0 : -1,
+      message: result.message,
+      data: result,
+    };
+  }
+
+  /**
+   * 获取模型详情
+   * GET /api/ai/models/:modelId
+   */
+  @Get('models/:modelId')
+  async findModelById(@Param('modelId') modelId: string) {
+    const model = await this.modelService.findById(modelId);
+    return {
+      code: 0,
+      message: 'success',
       data: model,
     };
   }
@@ -133,12 +148,12 @@ export class AIModelController {
   }
 
   /**
-   * 测试模型连接
-   * POST /api/ai/models/test-connection
+   * 通过模型ID测试连接（使用已保存的配置）
+   * POST /api/ai/models/:modelId/test-connection
    */
-  @Post('models/test-connection')
-  async testConnection(@Body() dto: TestConnectionDto) {
-    const result = await this.modelService.testConnection(dto);
+  @Post('models/:modelId/test-connection')
+  async testConnectionById(@Param('modelId') modelId: string) {
+    const result = await this.modelService.testConnectionById(modelId);
     return {
       code: result.success ? 0 : -1,
       message: result.message,

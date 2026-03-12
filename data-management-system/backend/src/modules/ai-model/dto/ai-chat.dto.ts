@@ -4,7 +4,7 @@
 * 创建时间：2026-03-11
 * 更新时间：2026-03-12
 */
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // 发送消息DTO
@@ -20,6 +20,10 @@ export class SendMessageDto {
   @IsString()
   @IsOptional()
   modelId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  useKnowledgeBase?: boolean;
 }
 
 // 获取对话历史DTO

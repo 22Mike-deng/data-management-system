@@ -116,3 +116,10 @@ export class TestConnectionDto {
   @IsNotEmpty()
   modelIdentifier: string;
 }
+
+// 通过模型ID测试连接DTO
+export class TestConnectionByIdDto {
+  @IsString()
+  @IsNotEmpty()
+  modelId: string;
+}

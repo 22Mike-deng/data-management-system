@@ -15,6 +15,7 @@ import {
   toggleModel,
   setDefaultModel,
   testConnection,
+  testConnectionById,
 } from '@/api/ai-model'
 import type { AIModelConfig } from '@/types'
 import Modal from '@/components/Modal.vue'
@@ -237,6 +238,30 @@ const handleSetDefault = async (model: AIModelConfig) => {
 
 // 测试连接
 const handleTest = async () => {
+  // 编辑模式下，如果没有填写API Key，使用已保存的配置测试
+  if (modalMode.value === 'edit' && !modelForm.value.apiKey && currentModel.value) {
+    testLoading.value = true
+    testResult.value = null
+    try {
+      const res = await testConnectionById(currentModel.value.modelId)
+      testResult.value = {
+        success: res.data?.success || false,
+        message: res.data?.responseTime
+          ? `${res.data?.message || '测试完成'} (${res.data.responseTime}ms)`
+          : res.data?.message || '测试完成',
+      }
+    } catch (error: any) {
+      testResult.value = {
+        success: false,
+        message: error.message || '测试失败',
+      }
+    } finally {
+      testLoading.value = false
+    }
+    return
+  }
+
+  // 新建模式或填写了API Key时，使用表单数据测试
   if (!modelForm.value.apiKey || !modelForm.value.modelIdentifier) {
     alert('请先填写API Key和模型标识符')
     return
@@ -253,7 +278,9 @@ const handleTest = async () => {
     })
     testResult.value = {
       success: res.data?.success || false,
-      message: res.data?.message || '测试完成',
+      message: res.data?.responseTime
+        ? `${res.data?.message || '测试完成'} (${res.data.responseTime}ms)`
+        : res.data?.message || '测试完成',
     }
   } catch (error: any) {
     testResult.value = {

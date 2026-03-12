@@ -11,9 +11,13 @@ import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { AIToolsService } from './ai-tools.service';
 import { AIModelController } from './ai-model.controller';
+import { KnowledgeBaseModule } from '../knowledge-base';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AIModelConfig, AIChatHistory, TokenUsage])],
+  imports: [
+    TypeOrmModule.forFeature([AIModelConfig, AIChatHistory, TokenUsage]),
+    KnowledgeBaseModule,
+  ],
   controllers: [AIModelController],
   providers: [AIModelService, AIChatService, AIToolsService],
   exports: [AIModelService, AIChatService, AIToolsService],

@@ -5,8 +5,8 @@
  * 更新时间：2026-03-12
  */
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from 'vue'
-import { Send, Bot, User, Plus, Trash2, MessageSquare } from 'lucide-vue-next'
+import { ref, onMounted, nextTick, computed, onUnmounted } from 'vue'
+import { Send, Bot, User, Plus, Trash2, MessageSquare, BookOpen, Square, Copy, Check } from 'lucide-vue-next'
 import { getEnabledModels, sendMessage, getSessionList, deleteSession, getChatHistory } from '@/api/ai-model'
 import type { AIModelConfig, ChatMessage } from '@/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -23,10 +23,15 @@ const modelList = ref<AIModelConfig[]>([])
 const loading = ref(false)
 // 消息容器引用
 const messageContainer = ref<HTMLElement | null>(null)
+// 用于取消请求的 AbortController
+const abortController = ref<AbortController | null>(null)
 
 // 会话列表
 const sessions = ref<any[]>([])
 const currentSessionId = ref('')
+
+// 知识库开关
+const useKnowledgeBase = ref(false)
 
 // 删除确认
 const showDeleteConfirm = ref(false)
@@ -81,6 +86,9 @@ const handleSendMessage = async () => {
   inputMessage.value = ''
   loading.value = true
 
+  // 创建 AbortController 用于取消请求
+  abortController.value = new AbortController()
+
   // 滚动到底部
   await nextTick()
   scrollToBottom()
@@ -90,7 +98,8 @@ const handleSendMessage = async () => {
       modelId: selectedModel.value,
       content: messageContent,
       sessionId: currentSessionId.value || undefined,
-    })
+      useKnowledgeBase: useKnowledgeBase.value,
+    }, abortController.value.signal)
 
     // 更新会话ID
     if (res.data?.sessionId) {
@@ -108,19 +117,39 @@ const handleSendMessage = async () => {
       createdAt: new Date().toISOString(),
     })
   } catch (error: any) {
-    messages.value.push({
-      chatId: '',
-      modelId: selectedModel.value,
-      sessionId: currentSessionId.value,
-      role: 'assistant',
-      content: `发生错误: ${error.message || '请求失败'}`,
-      createdAt: new Date().toISOString(),
-    })
+    // 如果是取消请求，不显示错误消息
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      messages.value.push({
+        chatId: '',
+        modelId: selectedModel.value,
+        sessionId: currentSessionId.value,
+        role: 'assistant',
+        content: '已停止生成',
+        createdAt: new Date().toISOString(),
+      })
+    } else {
+      messages.value.push({
+        chatId: '',
+        modelId: selectedModel.value,
+        sessionId: currentSessionId.value,
+        role: 'assistant',
+        content: `发生错误: ${error.message || '请求失败'}`,
+        createdAt: new Date().toISOString(),
+      })
+    }
   } finally {
     loading.value = false
+    abortController.value = null
     scrollToBottom()
     // 刷新会话列表
     loadSessions()
+  }
+}
+
+// 停止生成
+const handleStopGenerate = () => {
+  if (abortController.value) {
+    abortController.value.abort()
   }
 }
 
@@ -204,6 +233,7 @@ const toolNameMap: Record<string, string> = {
   count_data: '📊 统计数量',
   aggregate_data: '📈 聚合统计',
   group_by_field: '📊 分组统计',
+  search_knowledge: '📚 查询知识库',
 }
 
 // 获取工具显示名称
@@ -217,9 +247,43 @@ const currentModelName = computed(() => {
   return model?.modelName || 'AI'
 })
 
+// 复制相关
+const copiedIndex = ref<number | null>(null)
+
+// 复制消息内容
+const handleCopyMessage = async (content: string, index: number) => {
+  try {
+    await navigator.clipboard.writeText(content)
+    copiedIndex.value = index
+    setTimeout(() => {
+      copiedIndex.value = null
+    }, 2000)
+  } catch (error) {
+    console.error('复制失败:', error)
+    // 降级方案：创建临时文本区域
+    const textarea = document.createElement('textarea')
+    textarea.value = content
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    copiedIndex.value = index
+    setTimeout(() => {
+      copiedIndex.value = null
+    }, 2000)
+  }
+}
+
 onMounted(() => {
   loadModelList()
   loadSessions()
+})
+
+// 组件卸载时取消pending请求
+onUnmounted(() => {
+  if (abortController.value) {
+    abortController.value.abort()
+  }
 })
 </script>
 
@@ -279,6 +343,21 @@ onMounted(() => {
               {{ model.modelName }}
             </option>
           </select>
+          <!-- 知识库开关 -->
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <div class="relative">
+              <input
+                type="checkbox"
+                v-model="useKnowledgeBase"
+                class="sr-only peer"
+              />
+              <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+            </div>
+            <div class="flex items-center gap-1 text-sm" :class="useKnowledgeBase ? 'text-primary' : 'text-gray-500'">
+              <BookOpen class="w-4 h-4" />
+              <span>知识库</span>
+            </div>
+          </label>
         </div>
         <button
           class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -332,9 +411,19 @@ onMounted(() => {
             >
               <p class="text-sm whitespace-pre-wrap">{{ msg.content }}</p>
             </div>
-            <p class="text-xs text-gray-400 mt-1" :class="msg.role === 'user' ? 'text-right' : ''">
-              {{ formatTime(msg.createdAt) }}
-            </p>
+            <div class="flex items-center gap-2 mt-1" :class="msg.role === 'user' ? 'justify-end' : ''">
+              <p class="text-xs text-gray-400">
+                {{ formatTime(msg.createdAt) }}
+              </p>
+              <button
+                class="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                title="复制内容"
+                @click="handleCopyMessage(msg.content, index)"
+              >
+                <Check v-if="copiedIndex === index" class="w-3.5 h-3.5 text-green-500" />
+                <Copy v-else class="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           <div
             v-if="msg.role === 'user'"
@@ -368,15 +457,25 @@ onMounted(() => {
             @keydown.enter.exact.prevent="handleSendMessage"
           ></textarea>
           <button
+            v-if="!loading"
             class="p-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!inputMessage.trim() || loading || !selectedModel"
+            :disabled="!inputMessage.trim() || !selectedModel"
             @click="handleSendMessage"
           >
             <Send class="w-5 h-5" />
           </button>
+          <button
+            v-else
+            class="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors animate-pulse"
+            @click="handleStopGenerate"
+            title="点击停止生成"
+          >
+            <Square class="w-5 h-5" />
+          </button>
         </div>
         <p class="text-xs text-gray-400 mt-2 text-center">
           按 Enter 发送消息，模型: {{ currentModelName || '未选择' }}
+          <span v-if="useKnowledgeBase" class="text-primary ml-2">| 知识库已开启</span>
         </p>
       </div>
     </div>

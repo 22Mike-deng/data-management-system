@@ -16,6 +16,9 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     whitelist: false,
     transform: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
   }));
   
   // 启用CORS
