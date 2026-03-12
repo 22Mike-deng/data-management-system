@@ -1,0 +1,38 @@
+{
+  "name": "data-management-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "author": "dzh",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+  },
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "axios": "^1.6.2",
+    "dayjs": "^1.11.10",
+    "echarts": "^5.4.3",
+    "pinia": "^2.1.7",
+    "tdesign-icons-vue-next": "^0.3.4",
+    "tdesign-vue-next": "^1.9.4",
+    "vue": "^3.5.12",
+    "vue-echarts": "^6.6.7",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "autoprefixer": "^10.4.20",
+    "lucide-vue-next": "^0.303.0",
+    "postcss": "^8.5.0",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "~5.6.2",
+    "vite": "^5.4.10",
+    "vue-tsc": "^2.1.8"
+  }
+}

@@ -1,0 +1,12 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-03-11T10:57:29.851Z
+provider: 
+---
+
+1. 中文注释不可少；
+2. 文件标注创建者：dzh。创建时间，更新时间；
+3. 规范命名用驼峰命名法。
+4. 前端不能使用硬编码。
