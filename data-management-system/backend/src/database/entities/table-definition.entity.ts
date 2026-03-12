@@ -40,7 +40,7 @@ export class TableDefinition {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // 关联字段定义
-  @OneToMany(() => FieldDefinition, (field) => field.table)
+  // 关联字段定义（级联删除）
+  @OneToMany(() => FieldDefinition, (field) => field.table, { cascade: true })
   fields: FieldDefinition[];
 }

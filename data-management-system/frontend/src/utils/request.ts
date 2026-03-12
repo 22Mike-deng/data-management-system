@@ -39,7 +39,18 @@ service.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error('响应错误：', error)
+    // 输出详细错误信息
+    if (error.response) {
+      console.error('响应错误：', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers,
+      })
+    } else if (error.request) {
+      console.error('无响应：', error.request)
+    } else {
+      console.error('请求错误：', error.message)
+    }
     return Promise.reject(error)
   }
 )

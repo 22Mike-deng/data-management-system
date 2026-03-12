@@ -8,7 +8,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Edit, Trash2, Download, Upload, ArrowLeft, Search, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { getTableById, getTableFields } from '@/api/table-meta'
+import { getTableById, getTableFields, getTableList } from '@/api/table-meta'
 import { getDataList, createData, updateData, deleteData, batchDeleteData, createDynamicTable } from '@/api/dynamic-data'
 import type { TableDefinition, FieldDefinition, FieldType } from '@/types'
 import Modal from '@/components/Modal.vue'
@@ -23,6 +23,9 @@ const dataList = ref<any[]>([])
 const loading = ref(false)
 const tableInfo = ref<TableDefinition | null>(null)
 const fields = ref<FieldDefinition[]>([])
+
+// 外键关联数据缓存
+const foreignKeyDataCache = ref<Record<string, any[]>>({})
 
 // 分页
 const pagination = ref({
@@ -59,8 +62,33 @@ const loadTableInfo = async () => {
     // 加载字段
     const fieldsRes = await getTableFields(tableId.value)
     fields.value = fieldsRes.data || []
+    // 加载外键关联数据
+    await loadForeignKeyData()
   } catch (error) {
     console.error('加载表结构失败:', error)
+  }
+}
+
+// 加载外键关联数据
+const loadForeignKeyData = async () => {
+  // 获取所有表列表
+  const tablesRes = await getTableList()
+  const tables = tablesRes.data || []
+
+  // 找出所有外键字段并加载关联数据
+  for (const field of fields.value) {
+    if (field.isForeignKey && field.foreignKeyTable) {
+      const refTable = tables.find(t => t.tableName === field.foreignKeyTable)
+      if (refTable && !foreignKeyDataCache.value[field.foreignKeyTable]) {
+        try {
+          const res = await getDataList(refTable.tableId, { page: 1, pageSize: 1000 })
+          foreignKeyDataCache.value[field.foreignKeyTable] = res.data?.list || []
+        } catch (error) {
+          console.error(`加载外键关联数据失败: ${field.foreignKeyTable}`, error)
+          foreignKeyDataCache.value[field.foreignKeyTable] = []
+        }
+      }
+    }
   }
 }
 
@@ -95,12 +123,16 @@ const handleSearch = () => {
 // 重置表单数据
 const resetFormData = () => {
   formData.value = {}
+  if (!fields.value || fields.value.length === 0) {
+    console.warn('fields is empty, cannot reset form data')
+    return
+  }
   fields.value.forEach(field => {
     if (field.defaultValue) {
       formData.value[field.fieldName] = field.defaultValue
     } else if (field.fieldType === 'boolean') {
       formData.value[field.fieldName] = false
-    } else if (['number'].includes(field.fieldType)) {
+    } else if (['int', 'bigint', 'float', 'double', 'decimal'].includes(field.fieldType)) {
       formData.value[field.fieldName] = null
     } else {
       formData.value[field.fieldName] = ''
@@ -110,17 +142,55 @@ const resetFormData = () => {
 
 // 新增数据
 const handleAdd = () => {
+  if (!fields.value || fields.value.length === 0) {
+    alert('表单字段尚未加载，请稍后再试')
+    return
+  }
   modalMode.value = 'create'
   currentData.value = null
   resetFormData()
   showModal.value = true
 }
 
+// 格式化日期值为表单可用格式
+const formatDateForInput = (value: any, fieldType: string): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return ''
+
+  if (fieldType === 'date') {
+    // date 输入框需要 YYYY-MM-DD 格式
+    return date.toISOString().split('T')[0]
+  } else if (fieldType === 'datetime') {
+    // datetime-local 需要 YYYY-MM-DDTHH:mm 格式
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
+  return value
+}
+
 // 编辑数据
 const handleEdit = (row: any) => {
   modalMode.value = 'edit'
   currentData.value = row
+  // 复制数据并格式化日期类型字段
   formData.value = { ...row }
+  fields.value.forEach(field => {
+    if ((field.fieldType === 'date' || field.fieldType === 'datetime') && row[field.fieldName]) {
+      formData.value[field.fieldName] = formatDateForInput(row[field.fieldName], field.fieldType)
+    }
+    // JSON类型字段：对象转字符串便于编辑
+    if (field.fieldType === 'json' && row[field.fieldName]) {
+      const jsonValue = row[field.fieldName]
+      if (typeof jsonValue === 'object') {
+        formData.value[field.fieldName] = JSON.stringify(jsonValue, null, 2)
+      }
+    }
+  })
   showModal.value = true
 }
 
@@ -128,16 +198,30 @@ const handleEdit = (row: any) => {
 const handleSave = async () => {
   saveLoading.value = true
   try {
+    // 处理JSON类型字段：字符串转对象
+    const submitData = { ...formData.value }
+    fields.value.forEach(field => {
+      if (field.fieldType === 'json' && submitData[field.fieldName]) {
+        try {
+          // 尝试解析JSON字符串
+          submitData[field.fieldName] = JSON.parse(submitData[field.fieldName])
+        } catch {
+          // 解析失败则保持原值
+        }
+      }
+    })
+
     if (modalMode.value === 'create') {
-      await createData(tableId.value, formData.value)
+      await createData(tableId.value, submitData)
     } else if (currentData.value?.id) {
-      await updateData(tableId.value, currentData.value.id, formData.value)
+      await updateData(tableId.value, currentData.value.id, submitData)
     }
     showModal.value = false
     loadData()
-  } catch (error) {
+  } catch (error: any) {
     console.error('保存数据失败:', error)
-    alert('保存失败，请重试')
+    const errorMsg = error.response?.data?.message || error.message || '保存失败，请重试'
+    alert(errorMsg)
   } finally {
     saveLoading.value = false
   }
@@ -257,12 +341,24 @@ const goBack = () => {
 // 格式化显示值
 const formatValue = (value: any, field: FieldDefinition) => {
   if (value === null || value === undefined) return '-'
-  
+
+  // 外键字段显示关联数据的名称
+  if (field.isForeignKey && field.foreignKeyTable) {
+    const refData = foreignKeyDataCache.value[field.foreignKeyTable] || []
+    const refItem = refData.find(item => item.id === value)
+    if (refItem) {
+      return refItem.name || refItem.username || refItem.title || value
+    }
+    return value
+  }
+
   switch (field.fieldType) {
     case 'boolean':
       return value ? '是' : '否'
     case 'date':
       return new Date(value).toLocaleDateString('zh-CN')
+    case 'datetime':
+      return formatDateTime(value)
     case 'select':
       const opt = field.options?.find(o => o.value === value)
       return opt?.label || value
@@ -272,17 +368,52 @@ const formatValue = (value: any, field: FieldDefinition) => {
         const o = field.options?.find(opt => opt.value === v)
         return o?.label || v
       }).join(', ')
+    case 'json':
+      // JSON类型显示为格式化字符串
+      if (typeof value === 'object') {
+        return JSON.stringify(value)
+      }
+      return String(value)
     default:
       return value
   }
+}
+
+// 格式化日期时间
+const formatDateTime = (value: any): string => {
+  if (!value) return '-'
+  const date = new Date(value)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// 获取外键关联数据的显示文本
+const getForeignKeyDisplayText = (item: any): string => {
+  // 优先显示常见的名称字段
+  const nameField = item.name || item.username || item.title || item.displayName || item.label
+  if (nameField) {
+    return `${nameField} (${item.id?.substring(0, 8)}...)`
+  }
+  return item.id || '-'
 }
 
 // 字段类型映射
 const getInputType = (type: FieldType): string => {
   const typeMap: Record<string, string> = {
     text: 'text',
-    number: 'number',
+    varchar: 'text',
+    int: 'number',
+    bigint: 'number',
+    float: 'number',
+    double: 'number',
+    decimal: 'number',
     date: 'date',
+    datetime: 'datetime-local',
     image: 'url',
     file: 'url',
   }
@@ -400,6 +531,8 @@ watch(tableId, () => {
               >
                 {{ field.displayName }}
               </th>
+              <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">创建时间</th>
+              <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">更新时间</th>
               <th class="text-right px-4 py-3 text-sm font-medium text-gray-600 w-32">操作</th>
             </tr>
           </thead>
@@ -432,6 +565,8 @@ watch(tableId, () => {
                   {{ formatValue(row[field.fieldName], field) }}
                 </span>
               </td>
+              <td class="px-4 py-3 text-sm text-gray-500">{{ formatDateTime(row.created_at) }}</td>
+              <td class="px-4 py-3 text-sm text-gray-500">{{ formatDateTime(row.updated_at) }}</td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
@@ -493,15 +628,33 @@ watch(tableId, () => {
             <span v-if="field.required" class="text-red-500">*</span>
           </label>
 
-          <!-- 文本输入 -->
+          <!-- 文本/数字/日期输入 -->
           <input
-            v-if="['text', 'number', 'date'].includes(field.fieldType)"
+            v-if="['text', 'varchar', 'int', 'bigint', 'float', 'double', 'decimal', 'date', 'datetime'].includes(field.fieldType) && !field.isForeignKey"
             :type="getInputType(field.fieldType)"
             v-model="formData[field.fieldName]"
             :placeholder="`请输入${field.displayName}`"
             :required="field.required"
+            :step="['float', 'double', 'decimal'].includes(field.fieldType) ? 'any' : undefined"
             class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
+
+          <!-- 外键关联选择 -->
+          <select
+            v-else-if="field.isForeignKey && field.foreignKeyTable"
+            v-model="formData[field.fieldName]"
+            :required="field.required"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="">请选择{{ field.displayName }}</option>
+            <option
+              v-for="item in foreignKeyDataCache[field.foreignKeyTable] || []"
+              :key="item.id"
+              :value="item.id"
+            >
+              {{ getForeignKeyDisplayText(item) }}
+            </option>
+          </select>
 
           <!-- 多行文本/富文本 -->
           <textarea
@@ -580,6 +733,16 @@ watch(tableId, () => {
             :placeholder="`请输入${field.displayName}URL`"
             class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
+
+          <!-- JSON对象输入 -->
+          <textarea
+            v-else-if="field.fieldType === 'json'"
+            v-model="formData[field.fieldName]"
+            :placeholder="`请输入JSON格式数据，例如：{&quot;key&quot;: &quot;value&quot;}`"
+            :required="field.required"
+            rows="4"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-mono text-sm"
+          ></textarea>
         </div>
       </div>
       <template #footer>

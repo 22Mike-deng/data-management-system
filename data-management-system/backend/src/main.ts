@@ -2,7 +2,7 @@
  * NestJS 主入口文件
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -12,8 +12,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   // 启用全局验证管道
+  // 注意：whitelist: false 允许动态字段通过验证
   app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
+    whitelist: false,
     transform: true,
   }));
   

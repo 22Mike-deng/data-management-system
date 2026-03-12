@@ -34,7 +34,8 @@ import { TokenUsageModule } from './modules/token-usage';
         database: configService.get('DB_DATABASE', 'data_management'),
         entities: [__dirname + '/database/**/*.entity{.ts,.js}'],
         synchronize: configService.get('NODE_ENV') !== 'production',
-        logging: configService.get('NODE_ENV') !== 'production',
+        // 开发环境：只输出错误和警告；生产环境：关闭所有日志
+        logging: configService.get('NODE_ENV') === 'production' ? false : ['error'],
       }),
       inject: [ConfigService],
     }),

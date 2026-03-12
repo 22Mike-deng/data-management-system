@@ -24,12 +24,12 @@ export function getDataById(tableId: string, dataId: string): Promise<ApiRespons
 
 // 创建数据
 export function createData(tableId: string, data: Record<string, any>): Promise<ApiResponse<any>> {
-  return request.post(`/dynamic-data/${tableId}`, { data })
+  return request.post(`/dynamic-data/${tableId}`, data)
 }
 
 // 更新数据
 export function updateData(tableId: string, dataId: string, data: Record<string, any>): Promise<ApiResponse<any>> {
-  return request.put(`/dynamic-data/${tableId}/${dataId}`, { data })
+  return request.put(`/dynamic-data/${tableId}/${dataId}`, data)
 }
 
 // 删除数据

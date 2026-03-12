@@ -2,9 +2,9 @@
  * 动态数据控制器
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { DynamicDataService } from './dynamic-data.service';
 import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto } from './dto';
 
@@ -64,10 +64,12 @@ export class DynamicDataController {
    * POST /api/dynamic-data/:tableId
    */
   @Post(':tableId')
+  @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   async createData(
     @Param('tableId') tableId: string,
     @Body() dto: CreateDataDto,
   ) {
+    console.log('createData controller - dto:', JSON.stringify(dto, null, 2));
     const data = await this.dynamicDataService.createData(tableId, dto);
     return {
       code: 0,
@@ -81,6 +83,7 @@ export class DynamicDataController {
    * PUT /api/dynamic-data/:tableId/:dataId
    */
   @Put(':tableId/:dataId')
+  @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   async updateData(
     @Param('tableId') tableId: string,
     @Param('dataId') dataId: string,

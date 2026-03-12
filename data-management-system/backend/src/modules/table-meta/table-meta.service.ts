@@ -1,18 +1,25 @@
 /**
- * 数据表元数据服务
- * 创建者：dzh
- * 创建时间：2026-03-11
- * 更新时间：2026-03-11
- */
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+* 数据表元数据服务
+* 创建者：dzh
+* 创建时间：2026-03-11
+* 更新时间：2026-03-12
+*/
+import { Injectable, NotFoundException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { TableDefinition, FieldDefinition } from '@/database/entities';
 import { CreateTableDto, UpdateTableDto, CreateFieldDto, UpdateFieldDto } from './dto';
 
+// 动态数据服务接口，用于解决循环依赖
+export interface IDynamicDataService {
+  createDynamicTable(tableId: string): Promise<void>;
+}
+
 @Injectable()
 export class TableMetaService {
+  private dynamicDataService: IDynamicDataService | null = null;
+
   constructor(
     @InjectRepository(TableDefinition)
     private tableRepository: Repository<TableDefinition>,
@@ -20,6 +27,13 @@ export class TableMetaService {
     private fieldRepository: Repository<FieldDefinition>,
     private dataSource: DataSource,
   ) {}
+
+  /**
+   * 设置动态数据服务实例（用于解决循环依赖）
+   */
+  setDynamicDataService(service: IDynamicDataService) {
+    this.dynamicDataService = service;
+  }
 
   /**
    * 获取所有数据表列表
@@ -100,18 +114,21 @@ export class TableMetaService {
    */
   async deleteTable(tableId: string): Promise<void> {
     const table = await this.findTableById(tableId);
-    
+
     // 使用事务删除表和关联数据
     await this.dataSource.transaction(async (manager) => {
       // 删除动态数据表（如果存在）
       try {
-        await manager.query(`DROP TABLE IF EXISTS data_${table.tableName} CASCADE`);
+        await manager.query(`DROP TABLE IF EXISTS data_${table.tableName}`);
       } catch (e) {
         // 忽略表不存在的错误
       }
-      
-      // 删除元数据
-      await manager.remove(table);
+
+      // 先删除关联字段
+      await manager.delete(FieldDefinition, { tableId });
+
+      // 再删除表元数据
+      await manager.delete(TableDefinition, { tableId });
     });
   }
 
@@ -120,7 +137,7 @@ export class TableMetaService {
    */
   async addField(tableId: string, dto: CreateFieldDto): Promise<FieldDefinition> {
     await this.findTableById(tableId);
-    
+
     const field = this.fieldRepository.create({
       fieldId: uuidv4(),
       tableId,
@@ -130,7 +147,19 @@ export class TableMetaService {
       required: dto.required || false,
       defaultValue: dto.defaultValue,
       options: dto.options,
+      relationTable: dto.relationTable,
       relationTableId: dto.relationTableId,
+      // 新增字段属性
+      length: dto.length,
+      decimalPlaces: dto.decimalPlaces,
+      isIndex: dto.isIndex || false,
+      isUnique: dto.isUnique || false,
+      isForeignKey: dto.isForeignKey || false,
+      foreignKeyTable: dto.foreignKeyTable,
+      foreignKeyField: dto.foreignKeyField,
+      foreignKeyOnDelete: dto.foreignKeyOnDelete,
+      isAutoIncrement: dto.isAutoIncrement || false,
+      comment: dto.comment,
       sortOrder: dto.sortOrder || 0,
     });
 
@@ -148,7 +177,14 @@ export class TableMetaService {
       throw new NotFoundException(`字段 ${fieldId} 不存在`);
     }
     Object.assign(field, dto);
-    return this.fieldRepository.save(field);
+    const savedField = await this.fieldRepository.save(field);
+
+    // 同步表结构（如果字段类型等关键属性变更）
+    if (this.dynamicDataService && (dto.fieldType || dto.length || dto.decimalPlaces || dto.required)) {
+      await this.dynamicDataService.createDynamicTable(field.tableId);
+    }
+
+    return savedField;
   }
 
   /**

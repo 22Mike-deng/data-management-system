@@ -2,7 +2,7 @@
  * 数据表相关DTO
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
 import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsBoolean, IsEnum, IsNumber, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -10,15 +10,22 @@ import { Type } from 'class-transformer';
 // 字段类型枚举
 export enum FieldTypeEnum {
   TEXT = 'text',
-  NUMBER = 'number',
+  VARCHAR = 'varchar',
+  INT = 'int',
+  BIGINT = 'bigint',
+  FLOAT = 'float',
+  DOUBLE = 'double',
+  DECIMAL = 'decimal',
   BOOLEAN = 'boolean',
   DATE = 'date',
+  DATETIME = 'datetime',
   SELECT = 'select',
   MULTISELECT = 'multiselect',
   RICHTEXT = 'richtext',
   IMAGE = 'image',
   FILE = 'file',
   RELATION = 'relation',
+  JSON = 'json',
 }
 
 // 选项配置
@@ -62,7 +69,53 @@ export class CreateFieldDto {
 
   @IsString()
   @IsOptional()
+  relationTable?: string;
+
+  @IsString()
+  @IsOptional()
   relationTableId?: string;
+
+  // 新增字段属性
+  @IsNumber()
+  @IsOptional()
+  length?: number;
+
+  @IsNumber()
+  @IsOptional()
+  decimalPlaces?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isIndex?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isUnique?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isForeignKey?: boolean;
+
+  @IsString()
+  @IsOptional()
+  foreignKeyTable?: string;
+
+  @IsString()
+  @IsOptional()
+  foreignKeyField?: string;
+
+  @IsEnum(['CASCADE', 'SET NULL', 'RESTRICT'])
+  @IsOptional()
+  foreignKeyOnDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
+
+  @IsBoolean()
+  @IsOptional()
+  isAutoIncrement?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  comment?: string;
 
   @IsNumber()
   @IsOptional()
@@ -131,7 +184,53 @@ export class UpdateFieldDto {
 
   @IsString()
   @IsOptional()
+  relationTable?: string;
+
+  @IsString()
+  @IsOptional()
   relationTableId?: string;
+
+  // 新增字段属性
+  @IsNumber()
+  @IsOptional()
+  length?: number;
+
+  @IsNumber()
+  @IsOptional()
+  decimalPlaces?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isIndex?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isUnique?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isForeignKey?: boolean;
+
+  @IsString()
+  @IsOptional()
+  foreignKeyTable?: string;
+
+  @IsString()
+  @IsOptional()
+  foreignKeyField?: string;
+
+  @IsEnum(['CASCADE', 'SET NULL', 'RESTRICT'])
+  @IsOptional()
+  foreignKeyOnDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
+
+  @IsBoolean()
+  @IsOptional()
+  isAutoIncrement?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  comment?: string;
 
   @IsNumber()
   @IsOptional()

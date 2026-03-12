@@ -4,8 +4,8 @@
  * 创建时间：2026-03-11
  * 更新时间：2026-03-12
  */
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray, ValidateNested } from 'class-validator';
+import { Transform, plainToInstance } from 'class-transformer';
 
 // 查询参数DTO
 export class QueryDataDto {
@@ -34,14 +34,14 @@ export class QueryDataDto {
   sortOrder?: 'ASC' | 'DESC';
 }
 
-// 创建数据DTO（动态字段）
+// 创建数据DTO（动态字段）- 使用 Record 类型
 export class CreateDataDto {
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // 更新数据DTO（动态字段）
 export class UpdateDataDto {
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // 批量操作DTO
