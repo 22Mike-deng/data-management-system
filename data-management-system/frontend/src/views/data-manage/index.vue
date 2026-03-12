@@ -356,7 +356,7 @@ const formatValue = (value: any, field: FieldDefinition) => {
     case 'boolean':
       return value ? '是' : '否'
     case 'date':
-      return new Date(value).toLocaleDateString('zh-CN')
+      return formatDate(value)
     case 'datetime':
       return formatDateTime(value)
     case 'select':
@@ -379,17 +379,28 @@ const formatValue = (value: any, field: FieldDefinition) => {
   }
 }
 
+// 格式化日期（只显示日期）
+const formatDate = (value: any): string => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return String(value)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // 格式化日期时间
 const formatDateTime = (value: any): string => {
   if (!value) return '-'
   const date = new Date(value)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  if (isNaN(date.getTime())) return String(value)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
 // 获取外键关联数据的显示文本

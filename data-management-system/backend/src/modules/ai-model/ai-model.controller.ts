@@ -4,7 +4,7 @@
  * 创建时间：2026-03-11
  * 更新时间：2026-03-11
  */
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto } from './dto';
@@ -167,8 +167,8 @@ export class AIModelController {
    * GET /api/ai/chat/history
    */
   @Get('chat/history')
-  async getChatHistory() {
-    const result = await this.chatService.getChatHistory({});
+  async getChatHistory(@Query() dto: GetChatHistoryDto) {
+    const result = await this.chatService.getChatHistory(dto);
     return {
       code: 0,
       message: 'success',

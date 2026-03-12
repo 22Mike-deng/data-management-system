@@ -94,6 +94,11 @@ export class AIModelService {
       await this.clearDefaultFlag();
     }
 
+    // 如果 apiKey 为空或未提供，保留原有值
+    if (!dto.apiKey) {
+      delete dto.apiKey;
+    }
+
     Object.assign(model, dto);
     return this.modelRepository.save(model);
   }

@@ -62,8 +62,9 @@ export function sendMessage(data: SendMessageDto): Promise<ApiResponse<SendMessa
 }
 
 // 获取对话历史
-export function getChatHistory(): Promise<ApiResponse<ChatMessage[]>> {
-  return request.get('/ai/chat/history')
+export function getChatHistory(sessionId?: string): Promise<ApiResponse<{ list: ChatMessage[]; total: number }>> {
+  const params = sessionId ? { sessionId } : {}
+  return request.get('/ai/chat/history', { params })
 }
 
 // 获取会话列表
@@ -117,19 +118,27 @@ export interface TestConnectionResult {
 }
 
 export interface SendMessageDto {
-  modelId: string
-  message: string
+  modelId?: string
+  content: string
   sessionId?: string
 }
 
 export interface SendMessageResult {
-  response: string
+  reply: string
   sessionId: string
-  usage: {
-    inputTokens: number
-    outputTokens: number
-    totalTokens: number
+  tokens: {
+    input: number
+    output: number
   }
+  toolCalls?: ToolCallResult[]
+}
+
+// 工具调用结果
+export interface ToolCallResult {
+  toolCallId: string
+  name: string
+  success: boolean
+  result: any
 }
 
 export interface ChatSession {

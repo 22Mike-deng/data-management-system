@@ -323,6 +323,7 @@ export class DynamicDataService implements OnModuleInit {
     return typeMap[fieldType] || 'TEXT';
   }
 
+
   /**
    * 查询数据列表
    */
@@ -330,15 +331,16 @@ export class DynamicDataService implements OnModuleInit {
     const table = await this.tableMetaService.findTableById(tableId);
     const tableName = `data_${table.tableName}`;
 
-    const { page = 1, pageSize = 20, keyword, sortBy, sortOrder } = query;
+    const { page = 1, pageSize = 20, keyword, sortBy, sortOrder, filters } = query;
     const offset = (page - 1) * pageSize;
 
     // 构建查询条件
     let whereClause = '1=1';
     const params: unknown[] = [];
 
+    // 关键词搜索
     if (keyword) {
-      const textFields = table.fields.filter((f) => f.fieldType === 'text');
+      const textFields = table.fields.filter((f) => f.fieldType === 'text' || f.fieldType === 'varchar');
       if (textFields.length > 0) {
         const likeConditions = textFields
           .map(() => `?? LIKE ?`)
@@ -347,6 +349,17 @@ export class DynamicDataService implements OnModuleInit {
         textFields.forEach((f) => {
           params.push(f.fieldName, `%${keyword}%`);
         });
+      }
+    }
+
+    // 筛选条件处理
+    if (filters && filters.length > 0) {
+      for (const filter of filters) {
+        const condition = this.buildFilterCondition(filter);
+        if (condition) {
+          whereClause += ` AND ${condition.clause}`;
+          params.push(...condition.params);
+        }
       }
     }
 
@@ -376,6 +389,38 @@ export class DynamicDataService implements OnModuleInit {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * 构建筛选条件SQL
+   */
+  private buildFilterCondition(filter: { field: string; operator: string; value: any }): { clause: string; params: unknown[] } | null {
+    const { field, operator, value } = filter;
+
+    switch (operator) {
+      case 'eq':
+        return { clause: `?? = ?`, params: [field, value] };
+      case 'ne':
+        return { clause: `?? != ?`, params: [field, value] };
+      case 'gt':
+        return { clause: `?? > ?`, params: [field, value] };
+      case 'gte':
+        return { clause: `?? >= ?`, params: [field, value] };
+      case 'lt':
+        return { clause: `?? < ?`, params: [field, value] };
+      case 'lte':
+        return { clause: `?? <= ?`, params: [field, value] };
+      case 'like':
+        return { clause: `?? LIKE ?`, params: [field, `%${value}%`] };
+      case 'in':
+        if (Array.isArray(value) && value.length > 0) {
+          const placeholders = value.map(() => '?').join(', ');
+          return { clause: `?? IN (${placeholders})`, params: [field, ...value] };
+        }
+        return null;
+      default:
+        return null;
+    }
   }
 
   /**

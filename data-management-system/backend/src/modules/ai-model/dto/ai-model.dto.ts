@@ -29,6 +29,10 @@ export class ModelParametersDto {
   @IsNumber()
   @IsOptional()
   topP?: number;
+
+  @IsNumber()
+  @IsOptional()
+  contextLength?: number; // 上下文记忆消息数量
 }
 
 // 创建AI模型DTO

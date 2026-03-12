@@ -40,6 +40,7 @@ const modelForm = ref({
   temperature: 0.7,
   maxTokens: 4096,
   topP: 1,
+  contextLength: 20,
 })
 
 // 删除确认
@@ -95,6 +96,7 @@ const resetForm = () => {
     temperature: 0.7,
     maxTokens: 4096,
     topP: 1,
+    contextLength: 20,
   }
   testResult.value = null
 }
@@ -122,6 +124,7 @@ const handleEdit = (model: AIModelConfig) => {
     temperature: model.parameters?.temperature || 0.7,
     maxTokens: model.parameters?.maxTokens || 4096,
     topP: model.parameters?.topP || 1,
+    contextLength: model.parameters?.contextLength || 20,
   }
   testResult.value = null
   showModal.value = true
@@ -143,33 +146,40 @@ const updateDefaultEndpoint = (type: string) => {
 
 // 保存模型
 const handleSave = async () => {
-  if (!modelForm.value.modelName || !modelForm.value.apiKey || !modelForm.value.modelIdentifier) {
-    alert('请填写必填项')
+  // 验证必填项（编辑模式下 API Key 可选）
+  if (!modelForm.value.modelName || !modelForm.value.modelIdentifier) {
+    alert('请填写模型名称和模型标识符')
+    return
+  }
+  // 创建模式下 API Key 必填
+  if (modalMode.value === 'create' && !modelForm.value.apiKey) {
+    alert('请填写 API Key')
     return
   }
 
   saveLoading.value = true
   try {
-    const data = {
+    const data: any = {
       modelName: modelForm.value.modelName,
       modelType: modelForm.value.modelType,
       apiEndpoint: modelForm.value.apiEndpoint,
-      apiKey: modelForm.value.apiKey,
       modelIdentifier: modelForm.value.modelIdentifier,
       parameters: {
         temperature: modelForm.value.temperature,
         maxTokens: modelForm.value.maxTokens,
         topP: modelForm.value.topP,
+        contextLength: modelForm.value.contextLength,
       },
+    }
+
+    // 只有填写了 API Key 才传递
+    if (modelForm.value.apiKey) {
+      data.apiKey = modelForm.value.apiKey
     }
 
     if (modalMode.value === 'create') {
       await createModel(data)
     } else if (currentModel.value) {
-      // 如果没有填写新的API Key，则不更新
-      if (!modelForm.value.apiKey) {
-        delete (data as any).apiKey
-      }
       await updateModel(currentModel.value.modelId, data)
     }
     showModal.value = false
@@ -426,12 +436,12 @@ onMounted(() => {
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">
-            API Key <span class="text-red-500">*</span>
+            API Key <span v-if="modalMode === 'create'" class="text-red-500">*</span>
           </label>
           <input
             v-model="modelForm.apiKey"
             type="password"
-            placeholder="请输入API密钥"
+            :placeholder="modalMode === 'edit' ? '留空保持不变' : '请输入API密钥'"
             class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           <p v-if="modalMode === 'edit'" class="text-xs text-gray-400 mt-1">留空则保持原密钥不变</p>
@@ -463,7 +473,7 @@ onMounted(() => {
         <!-- 参数设置 -->
         <div class="border-t border-gray-100 pt-4">
           <h4 class="text-sm font-medium text-gray-700 mb-3">模型参数</h4>
-          <div class="grid grid-cols-3 gap-4">
+          <div class="grid grid-cols-4 gap-4">
             <div>
               <label class="block text-xs text-gray-500 mb-1">Temperature</label>
               <input
@@ -481,8 +491,11 @@ onMounted(() => {
                 v-model.number="modelForm.maxTokens"
                 type="number"
                 min="1"
+                max="1000000"
+                step="1"
                 class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
+              <p class="text-xs text-gray-400 mt-1">范围: 1-1000000</p>
             </div>
             <div>
               <label class="block text-xs text-gray-500 mb-1">Top P</label>
@@ -494,6 +507,18 @@ onMounted(() => {
                 step="0.1"
                 class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">上下文长度</label>
+              <input
+                v-model.number="modelForm.contextLength"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+              <p class="text-xs text-gray-400 mt-1">记忆消息数</p>
             </div>
           </div>
         </div>

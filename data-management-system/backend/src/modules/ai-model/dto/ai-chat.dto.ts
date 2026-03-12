@@ -1,10 +1,11 @@
 /**
- * AI对话相关DTO
- * 创建者：dzh
- * 创建时间：2026-03-11
- * 更新时间：2026-03-11
- */
+* AI对话相关DTO
+* 创建者：dzh
+* 创建时间：2026-03-11
+* 更新时间：2026-03-12
+*/
 import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // 发送消息DTO
 export class SendMessageDto {
@@ -27,11 +28,13 @@ export class GetChatHistoryDto {
   @IsOptional()
   sessionId?: string;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @IsOptional()
   page?: number = 1;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @IsOptional()

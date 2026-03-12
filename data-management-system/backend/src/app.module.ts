@@ -1,9 +1,9 @@
 /**
- * NestJS 根模块
- * 创建者：dzh
- * 创建时间：2026-03-11
- * 更新时间：2026-03-11
- */
+* NestJS 根模块
+* 创建者：dzh
+* 创建时间：2026-03-11
+* 更新时间：2026-03-12
+*/
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,6 +13,7 @@ import { TableMetaModule } from './modules/table-meta';
 import { DynamicDataModule } from './modules/dynamic-data';
 import { AIModelModule } from './modules/ai-model';
 import { TokenUsageModule } from './modules/token-usage';
+import { ViewConfigModule } from './modules/view-config';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { TokenUsageModule } from './modules/token-usage';
     DynamicDataModule,
     AIModelModule,
     TokenUsageModule,
+    ViewConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService],

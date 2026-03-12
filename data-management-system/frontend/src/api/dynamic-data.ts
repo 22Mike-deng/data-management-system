@@ -1,11 +1,18 @@
 /**
- * 动态数据API
- * 创建者：dzh
- * 创建时间：2026-03-12
- * 更新时间：2026-03-12
- */
+* 动态数据API
+* 创建者：dzh
+* 创建时间：2026-03-12
+* 更新时间：2026-03-12
+*/
 import request from '@/utils/request'
 import type { ApiResponse, PaginatedResponse } from '@/types'
+
+// 筛选条件类型
+export interface FilterCondition {
+  field: string
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'in'
+  value: string | number | string[] | number[]
+}
 
 // 创建动态数据表
 export function createDynamicTable(tableId: string): Promise<ApiResponse<void>> {
@@ -47,6 +54,7 @@ export interface QueryDataDto {
   page?: number
   pageSize?: number
   keyword?: string
-  orderBy?: string
-  orderDirection?: 'ASC' | 'DESC'
+  sortBy?: string
+  sortOrder?: 'ASC' | 'DESC'
+  filters?: FilterCondition[]
 }

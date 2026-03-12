@@ -2,7 +2,7 @@
  * AI对话服务
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,7 +10,22 @@ import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AIModelConfig, AIChatHistory, TokenUsage } from '@/database/entities';
 import { AIModelService } from './ai-model.service';
+import { AIToolsService } from './ai-tools.service';
 import { SendMessageDto, GetChatHistoryDto } from './dto';
+
+// 系统提示词
+const SYSTEM_PROMPT = `你是一个数据管理助手，可以帮助用户管理数据库中的数据。你可以使用以下工具：
+
+1. list_tables - 列出所有数据表
+2. describe_table - 查看表结构
+3. query_data - 查询表数据
+4. count_data - 统计数据总数
+5. aggregate_data - 聚合统计（求和、平均、最大、最小）
+6. group_by_field - 按字段分组统计
+
+当用户询问数据库相关问题时，你应该使用这些工具来获取信息并回答。
+回答时请用中文，并且格式化输出数据，使用Markdown表格展示数据列表。
+表名不需要带data_前缀，系统会自动处理。`;
 
 @Injectable()
 export class AIChatService {
@@ -20,12 +35,13 @@ export class AIChatService {
     @InjectRepository(TokenUsage)
     private tokenUsageRepository: Repository<TokenUsage>,
     private modelService: AIModelService,
+    private toolsService: AIToolsService,
   ) {}
 
   /**
    * 发送消息并获取AI回复
    */
-  async sendMessage(dto: SendMessageDto): Promise<{ reply: string; sessionId: string; tokens: { input: number; output: number } }> {
+  async sendMessage(dto: SendMessageDto): Promise<{ reply: string; sessionId: string; tokens: { input: number; output: number }; toolCalls?: any[] }> {
     // 获取使用的模型
     let model: AIModelConfig;
     if (dto.modelId) {
@@ -50,11 +66,12 @@ export class AIChatService {
     });
     await this.chatRepository.save(userMessage);
 
-    // 获取历史消息作为上下文
-    const history = await this.getRecentMessages(sessionId, 10);
+    // 获取历史消息作为上下文（根据模型配置的上下文长度，默认20条）
+    const contextLength = model.parameters?.contextLength || 20;
+    const history = await this.getRecentMessages(sessionId, contextLength);
 
-    // 调用AI模型获取回复
-    const { reply, inputTokens, outputTokens } = await this.callAIModel(model, dto.content, history);
+    // 调用AI模型获取回复（支持工具调用）
+    const { reply, inputTokens, outputTokens, toolCalls } = await this.callAIModelWithTools(model, dto.content, history);
 
     // 保存AI回复
     const assistantMessage = this.chatRepository.create({
@@ -73,6 +90,7 @@ export class AIChatService {
       reply,
       sessionId,
       tokens: { input: inputTokens, output: outputTokens },
+      toolCalls,
     };
   }
 
@@ -103,10 +121,30 @@ export class AIChatService {
       .select('chat.sessionId', 'sessionId')
       .addSelect('MIN(chat.createdAt)', 'createdAt')
       .addSelect('MIN(CASE WHEN chat.role = :userRole THEN chat.content END)', 'firstMessage')
+      .addSelect('MAX(chat.createdAt)', 'updatedAt')
       .setParameters({ userRole: 'user' })
       .groupBy('chat.sessionId')
-      .orderBy('MIN(chat.createdAt)', 'DESC')
+      .orderBy('MAX(chat.createdAt)', 'DESC')
       .getRawMany();
+
+    // 为每个会话获取模型名称
+    for (const session of sessions) {
+      // 获取该会话的一条记录来获取模型信息
+      const chatRecord = await this.chatRepository.findOne({
+        where: { sessionId: session.sessionId },
+        select: ['modelId'],
+      });
+      if (chatRecord?.modelId) {
+        try {
+          const model = await this.modelService.findById(chatRecord.modelId);
+          session.modelName = model.modelName;
+        } catch {
+          session.modelName = '未知模型';
+        }
+      }
+      // 使用 firstMessage 作为显示内容
+      session.lastMessage = session.firstMessage;
+    }
 
     return sessions;
   }
@@ -131,30 +169,245 @@ export class AIChatService {
   }
 
   /**
-   * 调用AI模型
+   * 调用AI模型（支持工具调用）
    */
-  private async callAIModel(
+  private async callAIModelWithTools(
     model: AIModelConfig,
     message: string,
     history: { role: string; content: string }[],
-  ): Promise<{ reply: string; inputTokens: number; outputTokens: number }> {
-    // TODO: 使用 LangChain 调用不同类型的模型
-    // 这里简化处理，模拟AI回复
-    
+  ): Promise<{ reply: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     // 构建消息历史
-    const messages = [
+    const messages: any[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: 'user', content: message },
     ];
 
-    // 模拟AI调用（实际应该调用 LangChain）
-    const reply = `这是一个模拟的AI回复。您说: "${message}"\n\n请配置有效的API密钥以使用真实的AI对话功能。`;
-    
-    // 估算Token数量（实际应该从API响应获取）
-    const inputTokens = Math.ceil(JSON.stringify(messages).length / 4);
-    const outputTokens = Math.ceil(reply.length / 4);
+    // 获取工具定义
+    const tools = this.toolsService.getToolDefinitions();
+    const allToolCalls: any[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
 
-    return { reply, inputTokens, outputTokens };
+    try {
+      // 根据模型类型调用不同的API
+      switch (model.modelType) {
+        case 'openai':
+        case 'qwen':
+        case 'zhipu':
+        case 'custom':
+          return await this.callOpenAIWithTools(model, messages, tools);
+        case 'claude':
+          return await this.callClaudeWithTools(model, messages, tools);
+        case 'wenxin':
+          throw new Error('文心一言暂不支持工具调用，请使用其他模型');
+        default:
+          return await this.callOpenAIWithTools(model, messages, tools);
+      }
+    } catch (error: any) {
+      console.error('AI调用失败:', error);
+      throw new Error(`AI调用失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 调用 OpenAI 兼容 API（支持工具调用）
+   */
+  private async callOpenAIWithTools(
+    model: AIModelConfig,
+    messages: any[],
+    tools: any[],
+  ): Promise<{ reply: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
+    const parameters = model.parameters || {};
+    const maxTokens = Math.min(parameters.maxTokens ?? 4096, 1000000);
+    const allToolCalls: any[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    // 最多允许3轮工具调用
+    for (let i = 0; i < 3; i++) {
+      const response = await fetch(`${model.apiEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${model.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model.modelIdentifier,
+          messages,
+          temperature: parameters.temperature ?? 0.7,
+          max_tokens: maxTokens,
+          top_p: parameters.topP ?? 1,
+          tools,
+          tool_choice: 'auto',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `API请求失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      totalInputTokens += data.usage?.prompt_tokens || 0;
+      totalOutputTokens += data.usage?.completion_tokens || 0;
+
+      const choice = data.choices?.[0];
+      const assistantMessage = choice?.message;
+
+      // 检查是否有工具调用
+      if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
+        // 添加助手消息到历史
+        messages.push({
+          role: 'assistant',
+          content: assistantMessage.content || '',
+          tool_calls: assistantMessage.tool_calls,
+        });
+
+        // 执行每个工具调用
+        for (const toolCall of assistantMessage.tool_calls) {
+          const result = await this.toolsService.executeToolCall(toolCall);
+          allToolCalls.push(result);
+
+          // 添加工具结果到消息历史
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result.result),
+          });
+        }
+      } else {
+        // 没有工具调用，返回最终回复
+        return {
+          reply: assistantMessage?.content || '抱歉，没有获取到回复',
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
+        };
+      }
+    }
+
+    // 超过最大轮数，返回当前状态
+    return {
+      reply: '工具调用次数已达上限，请尝试简化您的问题。',
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      toolCalls: allToolCalls,
+    };
+  }
+
+  /**
+   * 调用 Claude API（支持工具调用）
+   */
+  private async callClaudeWithTools(
+    model: AIModelConfig,
+    messages: any[],
+    tools: any[],
+  ): Promise<{ reply: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
+    const parameters = model.parameters || {};
+    const allToolCalls: any[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    // 转换工具定义为Claude格式
+    const claudeTools = tools.map(t => ({
+      name: t.function.name,
+      description: t.function.description,
+      input_schema: t.function.parameters,
+    }));
+
+    // 转换消息格式
+    const claudeMessages = messages
+      .filter(m => m.role !== 'system')
+      .map(m => {
+        if (m.role === 'tool') {
+          return {
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: m.tool_call_id,
+              content: m.content,
+            }],
+          };
+        }
+        return {
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        };
+      });
+
+    // 最多允许3轮工具调用
+    for (let i = 0; i < 3; i++) {
+      const response = await fetch(`${model.apiEndpoint}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': model.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: model.modelIdentifier,
+          system: SYSTEM_PROMPT,
+          messages: claudeMessages,
+          max_tokens: parameters.maxTokens ?? 2000,
+          temperature: parameters.temperature ?? 0.7,
+          tools: claudeTools,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `API请求失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      totalInputTokens += data.usage?.input_tokens || 0;
+      totalOutputTokens += data.usage?.output_tokens || 0;
+
+      // 检查是否有工具调用
+      const toolUseBlocks = data.content?.filter((c: any) => c.type === 'tool_use') || [];
+      const textBlock = data.content?.find((c: any) => c.type === 'text');
+
+      if (toolUseBlocks.length > 0) {
+        // 执行工具调用
+        for (const toolBlock of toolUseBlocks) {
+          const toolCall = {
+            id: toolBlock.id,
+            function: {
+              name: toolBlock.name,
+              arguments: JSON.stringify(toolBlock.input),
+            },
+          };
+          const result = await this.toolsService.executeToolCall(toolCall);
+          allToolCalls.push(result);
+
+          // 添加工具结果
+          claudeMessages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: JSON.stringify(result.result),
+            }],
+          });
+        }
+      } else {
+        // 返回最终回复
+        return {
+          reply: textBlock?.text || '抱歉，没有获取到回复',
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
+        };
+      }
+    }
+
+    return {
+      reply: '工具调用次数已达上限，请尝试简化您的问题。',
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      toolCalls: allToolCalls,
+    };
   }
 
   /**
@@ -168,9 +421,6 @@ export class AIChatService {
   ): Promise<void> {
     const totalTokens = inputTokens + outputTokens;
     
-    // TODO: 根据模型定价计算费用
-    const estimatedCost = 0;
-
     const usage = this.tokenUsageRepository.create({
       usageId: uuidv4(),
       modelId,
@@ -178,7 +428,7 @@ export class AIChatService {
       inputTokens,
       outputTokens,
       totalTokens,
-      estimatedCost,
+      estimatedCost: 0,
     });
 
     await this.tokenUsageRepository.save(usage);

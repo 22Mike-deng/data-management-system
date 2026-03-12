@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { Send, Bot, User, Plus, Trash2, MessageSquare } from 'lucide-vue-next'
-import { getEnabledModels, sendMessage, getSessionList, deleteSession } from '@/api/ai-model'
+import { getEnabledModels, sendMessage, getSessionList, deleteSession, getChatHistory } from '@/api/ai-model'
 import type { AIModelConfig, ChatMessage } from '@/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
@@ -88,7 +88,7 @@ const handleSendMessage = async () => {
   try {
     const res = await sendMessage({
       modelId: selectedModel.value,
-      message: messageContent,
+      content: messageContent,
       sessionId: currentSessionId.value || undefined,
     })
 
@@ -103,7 +103,8 @@ const handleSendMessage = async () => {
       modelId: selectedModel.value,
       sessionId: currentSessionId.value,
       role: 'assistant',
-      content: res.data?.response || '抱歉，我没有理解您的问题。',
+      content: res.data?.reply || '抱歉，我没有理解您的问题。',
+      toolCalls: res.data?.toolCalls,
       createdAt: new Date().toISOString(),
     })
   } catch (error: any) {
@@ -144,9 +145,23 @@ const newSession = () => {
 
 // 加载会话消息
 const loadSessionMessages = async (session: any) => {
-  // 这里应该有API获取历史消息，暂时跳过
   currentSessionId.value = session.sessionId
-  messages.value = []
+  try {
+    const res = await getChatHistory(session.sessionId)
+    messages.value = (res.data?.list || []).map((msg: any) => ({
+      chatId: msg.chatId,
+      modelId: msg.modelId,
+      sessionId: msg.sessionId,
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt,
+    }))
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('加载会话消息失败:', error)
+    messages.value = []
+  }
 }
 
 // 删除会话
@@ -179,6 +194,21 @@ const confirmDeleteSession = async () => {
 const formatTime = (dateStr: string) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+// 工具名称映射
+const toolNameMap: Record<string, string> = {
+  list_tables: '📋 列出数据表',
+  describe_table: '📝 查看表结构',
+  query_data: '🔍 查询数据',
+  count_data: '📊 统计数量',
+  aggregate_data: '📈 聚合统计',
+  group_by_field: '📊 分组统计',
+}
+
+// 获取工具显示名称
+const getToolDisplayName = (name: string) => {
+  return toolNameMap[name] || name
 }
 
 // 获取当前模型名称
@@ -281,6 +311,21 @@ onMounted(() => {
             <Bot class="w-4 h-4 text-primary" />
           </div>
           <div class="max-w-[70%]">
+            <!-- 工具调用显示 -->
+            <div v-if="msg.toolCalls && msg.toolCalls.length > 0" class="mb-2 space-y-1">
+              <div
+                v-for="(tool, ti) in msg.toolCalls"
+                :key="ti"
+                class="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-blue-700">{{ getToolDisplayName(tool.name) }}</span>
+                  <span :class="tool.success ? 'text-green-600' : 'text-red-600'">
+                    {{ tool.success ? '✓ 成功' : '✗ 失败' }}
+                  </span>
+                </div>
+              </div>
+            </div>
             <div
               class="px-4 py-3 rounded-2xl"
               :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'"

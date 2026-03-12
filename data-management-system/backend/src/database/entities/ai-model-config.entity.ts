@@ -44,6 +44,7 @@ export class AIModelConfig {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
+    contextLength?: number; // 上下文记忆消息数量，默认20条
   };
 
   // 是否启用
