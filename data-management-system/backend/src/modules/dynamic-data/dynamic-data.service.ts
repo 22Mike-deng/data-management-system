@@ -9,7 +9,7 @@ import { DataSource, QueryRunner } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { TableMetaService } from '../table-meta';
 import { FieldDefinition } from '@/database/entities';
-import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto } from './dto';
+import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto, AggregateQueryDto } from './dto';
 
 @Injectable()
 export class DynamicDataService implements OnModuleInit {
@@ -572,6 +572,148 @@ export class DynamicDataService implements OnModuleInit {
         return Boolean(value);
       default:
         return value;
+    }
+  }
+
+  /**
+   * 分组统计查询
+   * 支持多字段分组和多聚合统计
+   */
+  async aggregateQuery(tableId: string, query: AggregateQueryDto) {
+    const table = await this.tableMetaService.findTableById(tableId);
+    const tableName = `data_${table.tableName}`;
+
+    const { aggregates = [], groupBy = [], filters = [], sortBy, sortOrder = 'DESC', limit = 100 } = query;
+
+    // 默认统计：如果没有指定聚合配置，默认使用 COUNT(*)
+    const aggConfigs = aggregates.length > 0 ? aggregates : [{ type: 'count', alias: 'count' }];
+
+    // 构建SELECT部分
+    const selectParts: string[] = [];
+    const selectParams: unknown[] = [];
+
+    // 添加分组字段
+    if (groupBy.length > 0) {
+      groupBy.forEach((gb) => {
+        const field = table.fields.find((f) => f.fieldName === gb.field);
+        const isDateField = field && ['date', 'datetime'].includes(field.fieldType) || gb.field === 'created_at' || gb.field === 'updated_at';
+
+        if (isDateField && gb.timeGranularity) {
+          // 时间字段按粒度分组
+          const dateFormat = this.getDateFormatExpression(gb.timeGranularity);
+          selectParts.push(`DATE_FORMAT(??, '${dateFormat}') as ??`);
+          selectParams.push(gb.field, `${gb.field}_group`);
+        } else {
+          selectParts.push(`?? as ??`);
+          selectParams.push(gb.field, gb.field);
+        }
+      });
+    }
+
+    // 添加聚合字段
+    aggConfigs.forEach((agg, index) => {
+      const alias = agg.alias || `agg_${index}`;
+      if (agg.type === 'count') {
+        selectParts.push(`COUNT(*) as ??`);
+        selectParams.push(alias);
+      } else if (agg.field) {
+        const upperType = agg.type.toUpperCase();
+        selectParts.push(`${upperType}(??) as ??`);
+        selectParams.push(agg.field, alias);
+      }
+    });
+
+    // 构建WHERE条件
+    let whereClause = '1=1';
+    const whereParams: unknown[] = [];
+
+    if (filters && filters.length > 0) {
+      for (const filter of filters) {
+        const condition = this.buildFilterCondition(filter);
+        if (condition) {
+          whereClause += ` AND ${condition.clause}`;
+          whereParams.push(...condition.params);
+        }
+      }
+    }
+
+    // 构建GROUP BY
+    let groupByClause = '';
+    if (groupBy.length > 0) {
+      const groupFields = groupBy.map((gb) => {
+        const field = table.fields.find((f) => f.fieldName === gb.field);
+        const isDateField = field && ['date', 'datetime'].includes(field.fieldType) || gb.field === 'created_at' || gb.field === 'updated_at';
+        if (isDateField && gb.timeGranularity) {
+          return `DATE_FORMAT(??, '${this.getDateFormatExpression(gb.timeGranularity)}')`;
+        }
+        return '??';
+      });
+      groupByClause = `GROUP BY ${groupFields.join(', ')}`;
+      groupBy.forEach((gb) => {
+        const field = table.fields.find((f) => f.fieldName === gb.field);
+        const isDateField = field && ['date', 'datetime'].includes(field.fieldType) || gb.field === 'created_at' || gb.field === 'updated_at';
+        if (isDateField && gb.timeGranularity) {
+          whereParams.push(gb.field);
+        } else {
+          whereParams.push(gb.field);
+        }
+      });
+    }
+
+    // 构建ORDER BY
+    let orderClause = '';
+    const orderParams: unknown[] = [];
+    if (sortBy) {
+      orderClause = `ORDER BY ?? ${sortOrder}`;
+      orderParams.push(sortBy);
+    } else if (aggConfigs.length > 0) {
+      // 默认按聚合结果降序排序
+      const firstAlias = aggConfigs[0].alias || 'agg_0';
+      orderClause = `ORDER BY ?? DESC`;
+      orderParams.push(firstAlias);
+    }
+
+    // 构建完整SQL
+    const sql = `
+      SELECT ${selectParts.join(', ')}
+      FROM ??
+      WHERE ${whereClause}
+      ${groupByClause}
+      ${orderClause}
+      LIMIT ?
+    `;
+
+    const params = [
+      ...selectParams,
+      tableName,
+      ...whereParams,
+      ...orderParams,
+      limit,
+    ];
+
+    const result = await this.dataSource.query(sql, params);
+
+    return {
+      list: result,
+      total: result.length,
+    };
+  }
+
+  /**
+   * 获取日期格式化表达式
+   */
+  private getDateFormatExpression(granularity: string): string {
+    switch (granularity) {
+      case 'day':
+        return '%Y-%m-%d';
+      case 'week':
+        return '%Y-%u'; // 年-周
+      case 'month':
+        return '%Y-%m';
+      case 'year':
+        return '%Y';
+      default:
+        return '%Y-%m-%d';
     }
   }
 }

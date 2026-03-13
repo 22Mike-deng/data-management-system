@@ -2,11 +2,11 @@
  * 动态数据控制器
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { DynamicDataService } from './dynamic-data.service';
-import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto } from './dto';
+import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto, AggregateQueryDto } from './dto';
 
 @Controller('dynamic-data')
 export class DynamicDataController {
@@ -126,6 +126,24 @@ export class DynamicDataController {
     return {
       code: 0,
       message: '批量删除成功',
+    };
+  }
+
+  /**
+   * 分组统计查询
+   * GET /api/dynamic-data/:tableId/aggregate
+   * 支持多字段分组和多聚合统计
+   */
+  @Get(':tableId/aggregate')
+  async aggregateQuery(
+    @Param('tableId') tableId: string,
+    @Query() query: AggregateQueryDto,
+  ) {
+    const result = await this.dynamicDataService.aggregateQuery(tableId, query);
+    return {
+      code: 0,
+      message: 'success',
+      data: result,
     };
   }
 }

@@ -2,7 +2,7 @@
 * 动态数据相关DTO
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-12
+* 更新时间：2026-03-13
 */
 import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray, ValidateNested, IsIn } from 'class-validator';
 import { Transform, plainToInstance } from 'class-transformer';
@@ -62,6 +62,104 @@ export class QueryDataDto {
     return value || [];
   })
   filters?: FilterCondition[];
+}
+
+// 聚合统计配置
+export class AggregateConfig {
+  // 聚合类型：count, sum, avg, max, min
+  @IsString()
+  @IsIn(['count', 'sum', 'avg', 'max', 'min'])
+  type: string;
+
+  // 统计字段（count时可为空）
+  @IsString()
+  @IsOptional()
+  field?: string;
+
+  // 结果别名
+  @IsString()
+  @IsOptional()
+  alias?: string;
+}
+
+// 分组配置
+export class GroupByConfig {
+  // 分组字段
+  @IsString()
+  @IsNotEmpty()
+  field: string;
+
+  // 时间粒度（仅日期字段有效）：day, week, month, year
+  @IsString()
+  @IsOptional()
+  @IsIn(['day', 'week', 'month', 'year'])
+  timeGranularity?: string;
+}
+
+// 分组统计查询DTO
+export class AggregateQueryDto {
+  // 聚合统计配置
+  @IsArray()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value || [];
+  })
+  aggregates?: AggregateConfig[];
+
+  // 分组配置
+  @IsArray()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value || [];
+  })
+  groupBy?: GroupByConfig[];
+
+  // 筛选条件
+  @IsArray()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value || [];
+  })
+  filters?: FilterCondition[];
+
+  // 排序字段
+  @IsString()
+  @IsOptional()
+  sortBy?: string;
+
+  // 排序方向
+  @IsString()
+  @IsOptional()
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC';
+
+  // 返回条数限制
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  limit?: number = 100;
 }
 
 // 创建数据DTO（动态字段）- 使用 Record 类型
