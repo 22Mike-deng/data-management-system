@@ -2,13 +2,13 @@
 * AI对话相关DTO
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-12
+* 更新时间：2026-03-13
 */
 import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsBoolean, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // 深度思考模式类型
-export type ThinkingType = 'disabled' | 'enabled' | 'auto';
+export type ThinkingType = 'disabled' | 'enabled';
 
 // 发送消息DTO
 export class SendMessageDto {
@@ -28,7 +28,7 @@ export class SendMessageDto {
   @IsOptional()
   useKnowledgeBase?: boolean;
 
-  @IsEnum(['disabled', 'enabled', 'auto'], { message: 'thinkingType 必须是 disabled、enabled 或 auto' })
+  @IsEnum(['disabled', 'enabled'], { message: 'thinkingType 必须是 disabled 或 enabled' })
   @IsOptional()
   thinkingType?: ThinkingType;
 }

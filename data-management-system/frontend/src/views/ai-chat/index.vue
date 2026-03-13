@@ -2,12 +2,13 @@
  * AI对话页面
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed, onUnmounted } from 'vue'
-import { Send, Bot, User, Plus, Trash2, MessageSquare, BookOpen, Square, Copy, Check, Brain, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ref, onMounted, nextTick, computed, onUnmounted, watch } from 'vue'
+import { Send, Bot, User, Plus, Trash2, MessageSquare, BookOpen, Square, Copy, Check, Brain, ChevronDown, ChevronUp, Table } from 'lucide-vue-next'
 import { getEnabledModels, streamMessage, getSessionList, deleteSession, getChatHistory } from '@/api/ai-model'
+import { getTableList } from '@/api/table-meta'
 import type { AIModelConfig, ChatMessage } from '@/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
@@ -23,6 +24,8 @@ const modelList = ref<AIModelConfig[]>([])
 const loading = ref(false)
 // 消息容器引用
 const messageContainer = ref<HTMLElement | null>(null)
+// 输入框引用
+const inputTextarea = ref<HTMLTextAreaElement | null>(null)
 // 用于取消流式请求
 const streamAbort = ref<{ abort: () => void } | null>(null)
 
@@ -33,13 +36,25 @@ const currentSessionId = ref('')
 // 知识库开关
 const useKnowledgeBase = ref(false)
 
-// 深度思考模式：disabled-关闭, enabled-开启, auto-自动
-const thinkingMode = ref<'disabled' | 'enabled' | 'auto'>('auto')
+// 深度思考模式：disabled-关闭, enabled-开启
+const thinkingMode = ref<'disabled' | 'enabled'>('enabled')
 
 // 删除确认
 const showDeleteConfirm = ref(false)
 const deleteTargetSession = ref<any>(null)
 const deleteLoading = ref(false)
+
+// ==================== @提及功能 ====================
+// 所有表列表（排除sys_前缀的系统表）
+const allTables = ref<{ tableName: string; displayName: string }[]>([])
+// 是否显示提及列表
+const showMentionList = ref(false)
+// 提及列表筛选关键词
+const mentionKeyword = ref('')
+// 当前选中的提及项索引
+const mentionSelectedIndex = ref(0)
+// @符号的位置
+const mentionStartPosition = ref(-1)
 
 // 加载模型列表
 const loadModelList = async () => {
@@ -55,6 +70,146 @@ const loadModelList = async () => {
     }
   } catch (error) {
     console.error('加载模型列表失败:', error)
+  }
+}
+
+// 加载表列表（用于@提及功能）
+const loadTableList = async () => {
+  try {
+    const res = await getTableList()
+    // 过滤掉sys_前缀的系统表
+    allTables.value = (res.data || [])
+      .filter((t: any) => !t.tableName.startsWith('sys_'))
+      .map((t: any) => ({
+        tableName: t.tableName.replace('data_', ''), // 移除data_前缀
+        displayName: t.displayName || t.tableName,
+      }))
+  } catch (error) {
+    console.error('加载表列表失败:', error)
+  }
+}
+
+// 筛选后的提及列表
+const filteredMentionList = computed(() => {
+  if (!mentionKeyword.value) {
+    return allTables.value.slice(0, 10) // 默认显示前10个
+  }
+  const keyword = mentionKeyword.value.toLowerCase()
+  return allTables.value
+    .filter(t => 
+      t.tableName.toLowerCase().includes(keyword) || 
+      t.displayName.toLowerCase().includes(keyword)
+    )
+    .slice(0, 10) // 最多显示10个
+})
+
+// 处理输入事件
+const handleInput = (event: Event) => {
+  const textarea = event.target as HTMLTextAreaElement
+  const value = textarea.value
+  const cursorPos = textarea.selectionStart
+  
+  // 查找当前光标位置前最近的@符号
+  let atPos = -1
+  for (let i = cursorPos - 1; i >= 0; i--) {
+    if (value[i] === '@') {
+      atPos = i
+      break
+    }
+    // 如果遇到空格或换行，停止搜索
+    if (value[i] === ' ' || value[i] === '\n') {
+      break
+    }
+  }
+  
+  if (atPos !== -1 && atPos < cursorPos) {
+    // 找到@符号，显示提及列表
+    mentionStartPosition.value = atPos
+    mentionKeyword.value = value.substring(atPos + 1, cursorPos)
+    showMentionList.value = true
+    mentionSelectedIndex.value = 0
+  } else {
+    // 没有找到@符号，隐藏提及列表
+    showMentionList.value = false
+    mentionStartPosition.value = -1
+    mentionKeyword.value = ''
+  }
+}
+
+// 选择提及项
+const selectMention = (table: { tableName: string; displayName: string }) => {
+  if (!inputTextarea.value || mentionStartPosition.value === -1) return
+  
+  const value = inputMessage.value
+  const cursorPos = inputTextarea.value.selectionStart
+  
+  // 替换@及其后面的关键词为选中的表名
+  const beforeAt = value.substring(0, mentionStartPosition.value)
+  const afterKeyword = value.substring(cursorPos)
+  const newValue = beforeAt + table.tableName + ' ' + afterKeyword
+  
+  inputMessage.value = newValue
+  
+  // 隐藏提及列表
+  showMentionList.value = false
+  mentionStartPosition.value = -1
+  mentionKeyword.value = ''
+  
+  // 设置光标位置到插入内容之后
+  nextTick(() => {
+    if (inputTextarea.value) {
+      const newCursorPos = beforeAt.length + table.tableName.length + 1
+      inputTextarea.value.focus()
+      inputTextarea.value.setSelectionRange(newCursorPos, newCursorPos)
+    }
+  })
+}
+
+// 处理键盘事件（用于导航提及列表）
+const handleKeydown = (event: KeyboardEvent) => {
+  if (!showMentionList.value) {
+    // 正常发送消息
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      handleSendMessage()
+    }
+    return
+  }
+  
+  // 提及列表打开时的键盘处理
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      mentionSelectedIndex.value = Math.min(
+        mentionSelectedIndex.value + 1,
+        filteredMentionList.value.length - 1
+      )
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      mentionSelectedIndex.value = Math.max(mentionSelectedIndex.value - 1, 0)
+      break
+    case 'Enter':
+    case 'Tab':
+      event.preventDefault()
+      if (filteredMentionList.value[mentionSelectedIndex.value]) {
+        selectMention(filteredMentionList.value[mentionSelectedIndex.value])
+      }
+      break
+    case 'Escape':
+      event.preventDefault()
+      showMentionList.value = false
+      mentionStartPosition.value = -1
+      mentionKeyword.value = ''
+      break
+  }
+}
+
+// 点击外部关闭提及列表
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.mention-dropdown') && !target.closest('textarea')) {
+    showMentionList.value = false
   }
 }
 
@@ -253,6 +408,9 @@ const toolNameMap: Record<string, string> = {
   aggregate_data: '📈 聚合统计',
   group_by_field: '📊 分组统计',
   search_knowledge: '📚 查询知识库',
+  insert_record: '➕ 插入记录',
+  update_record: '✏️ 更新记录',
+  search_field: '🔎 搜索字段',
 }
 
 // 获取工具显示名称
@@ -308,6 +466,9 @@ const handleCopyMessage = async (content: string, index: number) => {
 onMounted(() => {
   loadModelList()
   loadSessions()
+  loadTableList()
+  // 添加点击外部关闭提及列表的监听
+  document.addEventListener('click', handleClickOutside)
 })
 
 // 组件卸载时取消pending请求
@@ -315,6 +476,8 @@ onUnmounted(() => {
   if (streamAbort.value) {
     streamAbort.value.abort()
   }
+  // 移除点击监听
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -398,8 +561,7 @@ onUnmounted(() => {
               title="深度思考模式"
             >
               <option value="disabled">关闭思考</option>
-              <option value="auto">自动思考</option>
-              <option value="enabled">强制思考</option>
+              <option value="enabled">开启思考</option>
             </select>
           </div>
         </div>
@@ -509,15 +671,44 @@ onUnmounted(() => {
       </div>
 
       <!-- 输入区域 -->
-      <div class="p-4 border-t border-gray-100">
+      <div class="p-4 border-t border-gray-100 relative">
         <div class="flex items-end gap-3">
-          <textarea
-            v-model="inputMessage"
-            class="flex-1 px-4 py-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder="输入消息..."
-            rows="1"
-            @keydown.enter.exact.prevent="handleSendMessage"
-          ></textarea>
+          <div class="flex-1 relative">
+            <textarea
+              ref="inputTextarea"
+              v-model="inputMessage"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="输入消息... 使用 @ 提及数据表"
+              rows="1"
+              @input="handleInput"
+              @keydown="handleKeydown"
+            ></textarea>
+            <!-- @提及下拉列表 -->
+            <div
+              v-if="showMentionList && filteredMentionList.length > 0"
+              class="mention-dropdown absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto z-10"
+            >
+              <div class="p-2 text-xs text-gray-500 border-b border-gray-100">
+                <Table class="w-3 h-3 inline-block mr-1" />
+                选择数据表
+              </div>
+              <div
+                v-for="(table, index) in filteredMentionList"
+                :key="table.tableName"
+                class="px-3 py-2 cursor-pointer transition-colors"
+                :class="index === mentionSelectedIndex ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50'"
+                @click="selectMention(table)"
+              >
+                <div class="flex items-center gap-2">
+                  <Table class="w-4 h-4 text-gray-400" />
+                  <div>
+                    <div class="text-sm font-medium">{{ table.tableName }}</div>
+                    <div class="text-xs text-gray-400">{{ table.displayName }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <button
             v-if="!loading"
             class="p-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -536,9 +727,9 @@ onUnmounted(() => {
           </button>
         </div>
         <p class="text-xs text-gray-400 mt-2 text-center">
-          按 Enter 发送消息，模型: {{ currentModelName || '未选择' }}
+          按 Enter 发送消息 | 输入 @ 提及数据表 | 模型: {{ currentModelName || '未选择' }}
           <span v-if="useKnowledgeBase" class="text-primary ml-2">| 知识库已开启</span>
-          <span v-if="thinkingMode !== 'disabled'" class="text-purple-500 ml-2">| {{ thinkingMode === 'enabled' ? '强制思考' : '自动思考' }}</span>
+          <span v-if="thinkingMode === 'enabled'" class="text-purple-500 ml-2">| 思考模式已开启</span>
         </p>
       </div>
     </div>

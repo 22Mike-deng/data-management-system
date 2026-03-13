@@ -2,10 +2,11 @@
  * AI工具服务 - 数据库管理工具
  * 创建者：dzh
  * 创建时间：2026-03-12
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { KnowledgeBaseService } from '../knowledge-base';
 
 // 工具定义接口
@@ -69,7 +70,7 @@ export class AIToolsService {
             properties: {
               tableName: {
                 type: 'string',
-                description: '表名称（不需要带data_前缀）',
+                description: '表名称（不需要带data_前缀）,但是输出的表名称会带上data_前缀',
               },
             },
             required: ['tableName'],
@@ -182,6 +183,69 @@ export class AIToolsService {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'insert_record',
+          description: '向指定表中插入一条新记录。在插入前应该先调用describe_table了解表结构，确保提供正确的字段名和必填字段。',
+          parameters: {
+            type: 'object',
+            properties: {
+              tableName: {
+                type: 'string',
+                description: '表名称（不需要带data_前缀）',
+              },
+              data: {
+                type: 'object',
+                description: '要插入的数据，键为字段名，值为字段值。例如: {"name": "张三", "age": 25}',
+              },
+            },
+            required: ['tableName', 'data'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'update_record',
+          description: '更新表中指定条件的记录。在更新前应该先调用describe_table了解表结构，确保提供正确的字段名。',
+          parameters: {
+            type: 'object',
+            properties: {
+              tableName: {
+                type: 'string',
+                description: '表名称（不需要带data_前缀）',
+              },
+              data: {
+                type: 'object',
+                description: '要更新的数据，键为字段名，值为新值。例如: {"name": "李四", "age": 30}',
+              },
+              recordId: {
+                type: 'string',
+                description: '要更新的记录ID（主键），通常是从查询结果中获取的id字段',
+              },
+            },
+            required: ['tableName', 'data', 'recordId'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'search_field',
+          description: '智能搜索表和字段：1.在sys_table中搜索匹配的表名或显示名；2.在sys_field中搜索匹配的字段名或显示名；3.返回所有相关表的完整结构。用于在用户提到的字段不存在时，帮助找到正确的表。例如：用户说"年龄"但当前表没有，调用此工具搜索"年龄"或"age"，会返回相关表及其完整字段列表。',
+          parameters: {
+            type: 'object',
+            properties: {
+              keyword: {
+                type: 'string',
+                description: '搜索关键词，可以是表名、表显示名、字段名或字段显示名。例如: "用户", "user", "年龄", "age"',
+              },
+            },
+            required: ['keyword'],
+          },
+        },
+      },
     ];
 
     // 知识库查询工具（可选）
@@ -243,6 +307,15 @@ export class AIToolsService {
           break;
         case 'group_by_field':
           result = await this.groupByField(args);
+          break;
+        case 'insert_record':
+          result = await this.insertRecord(args.tableName, args.data);
+          break;
+        case 'update_record':
+          result = await this.updateRecord(args.tableName, args.data, args.recordId);
+          break;
+        case 'search_field':
+          result = await this.searchField(args.keyword);
           break;
         case 'search_knowledge':
           result = await this.searchKnowledge(args.query, args.limit);
@@ -560,5 +633,271 @@ export class AIToolsService {
         source: r.source,
       })),
     };
+  }
+
+  /**
+   * 插入记录
+   */
+  private async insertRecord(tableName: string, data: Record<string, any>): Promise<any> {
+    const fullTableName = `data_${tableName}`;
+
+    // 检查表是否存在
+    const tableExists = await this.dataSource.query(`
+      SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    if (tableExists[0].count === 0) {
+      throw new Error(`表 ${tableName} 不存在`);
+    }
+
+    // 获取表结构，验证字段
+    const columns = await this.dataSource.query(`
+      SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+      ORDER BY ORDINAL_POSITION
+    `, [fullTableName]);
+
+    const columnNames = columns.map((c: any) => c.COLUMN_NAME);
+    const invalidFields = Object.keys(data).filter(key => !columnNames.includes(key));
+    
+    if (invalidFields.length > 0) {
+      throw new Error(`字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);
+    }
+
+    // 检查 id 字段是否需要自动生成
+    const idColumn = columns.find((c: any) => c.COLUMN_NAME === 'id');
+    const isAutoIncrement = idColumn?.EXTRA?.includes('auto_increment');
+    
+    // 如果 id 字段不是自增的，且用户没有提供 id，则自动生成 UUID
+    if (idColumn && !isAutoIncrement && !data.hasOwnProperty('id')) {
+      data = { id: uuidv4(), ...data };
+    }
+
+    // 检查必填字段（排除自增主键和有默认值的字段）
+    const notNullColumns = columns.filter((c: any) => 
+      c.IS_NULLABLE === 'NO' && 
+      c.COLUMN_DEFAULT === null &&
+      !c.EXTRA?.includes('auto_increment') &&
+      c.COLUMN_NAME !== 'created_at' &&
+      c.COLUMN_NAME !== 'updated_at'
+    );
+    
+    const missingFields = notNullColumns
+      .filter((c: any) => !data.hasOwnProperty(c.COLUMN_NAME))
+      .map((c: any) => c.COLUMN_NAME);
+    
+    if (missingFields.length > 0) {
+      throw new Error(`缺少必填字段: ${missingFields.join(', ')}`);
+    }
+
+    // 构建插入SQL
+    const fields = Object.keys(data);
+    const values = Object.values(data);
+    const placeholders = fields.map(() => '?').join(', ');
+    
+    const sql = `INSERT INTO ?? (${fields.map(() => '??').join(', ')}) VALUES (${placeholders})`;
+    const params = [fullTableName, ...fields, ...values];
+
+    const result = await this.dataSource.query(sql, params);
+
+    return {
+      success: true,
+      message: `成功向表 ${tableName} 插入 1 条记录`,
+      insertId: data.id || result.insertId,
+      affectedRows: result.affectedRows,
+    };
+  }
+
+  /**
+   * 更新记录
+   */
+  private async updateRecord(tableName: string, data: Record<string, any>, recordId: string): Promise<any> {
+    const fullTableName = `data_${tableName}`;
+
+    // 检查表是否存在
+    const tableExists = await this.dataSource.query(`
+      SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    if (tableExists[0].count === 0) {
+      throw new Error(`表 ${tableName} 不存在`);
+    }
+
+    // 检查记录是否存在
+    const existingRecord = await this.dataSource.query(
+      `SELECT id FROM ?? WHERE id = ?`,
+      [fullTableName, recordId]
+    );
+
+    if (existingRecord.length === 0) {
+      throw new Error(`记录不存在: ID = ${recordId}`);
+    }
+
+    // 获取表结构，验证字段
+    const columns = await this.dataSource.query(`
+      SELECT COLUMN_NAME, DATA_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    const columnNames = columns.map((c: any) => c.COLUMN_NAME);
+    const invalidFields = Object.keys(data).filter(key => !columnNames.includes(key));
+    
+    if (invalidFields.length > 0) {
+      throw new Error(`字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);
+    }
+
+    // 禁止更新的字段
+    const protectedFields = ['id', 'created_at'];
+    const attemptedProtectedFields = Object.keys(data).filter(key => protectedFields.includes(key));
+    
+    if (attemptedProtectedFields.length > 0) {
+      throw new Error(`禁止更新字段: ${attemptedProtectedFields.join(', ')}`);
+    }
+
+    // 构建更新SQL
+    const fields = Object.keys(data);
+    const values = Object.values(data);
+    const setClause = fields.map(() => '?? = ?').join(', ');
+    
+    const sql = `UPDATE ?? SET ${setClause} WHERE id = ?`;
+    const params = [fullTableName, ...fields.flatMap((field, i) => [field, values[i]]), recordId];
+
+    const result = await this.dataSource.query(sql, params);
+
+    return {
+      success: true,
+      message: `成功更新表 ${tableName} 中的记录 (ID: ${recordId})`,
+      recordId,
+      affectedRows: result.affectedRows,
+    };
+  }
+
+  /**
+   * 搜索表和字段
+   * 逻辑：先搜索相关表（按表名或显示名），再获取这些表的结构，同时搜索字段
+   * 帮助AI找到包含特定字段的正确表
+   */
+  private async searchField(keyword: string): Promise<any> {
+    try {
+      console.log(`[search_field] Searching for: ${keyword}`);
+      const lowerKeyword = keyword.toLowerCase();
+
+      // 步骤1：在 sys_table 中搜索相关的表（按表名或显示名）
+      const matchedTables = await this.dataSource.query(`
+        SELECT tableName, displayName
+        FROM sys_table
+        WHERE LOWER(tableName) LIKE ? 
+           OR LOWER(displayName) LIKE ?
+        ORDER BY tableName
+      `, [`%${lowerKeyword}%`, `%${lowerKeyword}%`]);
+
+      console.log(`[search_field] Found ${matchedTables.length} matching tables`);
+
+      // 步骤2：在 sys_field 中搜索相关的字段
+      const matchedFields = await this.dataSource.query(`
+        SELECT 
+          f.fieldName,
+          f.displayName,
+          f.fieldType,
+          t.tableName,
+          t.displayName as tableDisplayName
+        FROM sys_field f
+        JOIN sys_table t ON f.tableId = t.tableId
+        WHERE LOWER(f.fieldName) LIKE ? 
+           OR LOWER(f.displayName) LIKE ?
+        ORDER BY t.tableName, f.fieldName
+      `, [`%${lowerKeyword}%`, `%${lowerKeyword}%`]);
+
+      console.log(`[search_field] Found ${matchedFields.length} matching fields`);
+
+      // 步骤3：合并结果，获取每个匹配表的完整结构
+      const tableSet = new Set<string>();
+      
+      // 添加匹配到的表
+      matchedTables.forEach((t: any) => tableSet.add(t.tableName));
+      // 添加包含匹配字段的表
+      matchedFields.forEach((f: any) => tableSet.add(f.tableName));
+
+      // 如果没有匹配，返回提示
+      if (tableSet.size === 0) {
+        return {
+          keyword,
+          found: false,
+          message: `未找到与"${keyword}"相关的表或字段。建议使用 list_tables 工具查看所有可用表。`,
+          matchedTables: [],
+          matchedFields: [],
+          tableStructures: [],
+        };
+      }
+
+      // 步骤4：获取每个匹配表的完整结构
+      const tableStructures: any[] = [];
+      for (const tableName of Array.from(tableSet)) {
+        try {
+          const structure = await this.describeTable(tableName);
+          // 标记哪些字段匹配了关键词
+          const fieldsWithMatch = structure.map((field: any) => ({
+            ...field,
+            isMatch: field.field.toLowerCase().includes(lowerKeyword) || 
+                      (field.displayName?.toLowerCase() || '').includes(lowerKeyword),
+          }));
+          tableStructures.push({
+            tableName,
+            tableDisplayName: matchedTables.find((t: any) => t.tableName === tableName)?.displayName || tableName,
+            fields: fieldsWithMatch,
+            matchedFieldCount: fieldsWithMatch.filter((f: any) => f.isMatch).length,
+          });
+        } catch (e: any) {
+          console.error(`[search_field] Error describing table ${tableName}:`, e.message);
+          // 跳过无法获取结构的表，继续处理其他表
+        }
+      }
+
+      // 按匹配字段数量排序（优先显示包含匹配字段的表）
+      tableStructures.sort((a, b) => b.matchedFieldCount - a.matchedFieldCount);
+
+      console.log(`[search_field] Returning ${tableStructures.length} table structures`);
+
+      return {
+        keyword,
+        found: true,
+        summary: {
+          matchedTablesCount: matchedTables.length,
+          matchedFieldsCount: matchedFields.length,
+          totalTablesToCheck: tableStructures.length,
+        },
+        // 匹配的表列表
+        matchedTables: matchedTables.map((t: any) => ({
+          tableName: t.tableName,
+          displayName: t.displayName,
+        })),
+        // 匹配的字段列表
+        matchedFields: matchedFields.map((f: any) => ({
+          tableName: f.tableName,
+          tableDisplayName: f.tableDisplayName,
+          fieldName: f.fieldName,
+          displayName: f.displayName,
+          fieldType: f.fieldType,
+        })),
+        // 完整的表结构（用于AI判断）
+        tableStructures,
+        message: `找到 ${matchedTables.length} 个匹配的表名，${matchedFields.length} 个匹配的字段。已获取 ${tableStructures.length} 个相关表的完整结构供参考。`,
+      };
+    } catch (error: any) {
+      console.error(`[search_field] Error:`, error);
+      return {
+        keyword,
+        found: false,
+        error: error.message,
+        message: `搜索过程中发生错误: ${error.message}`,
+        matchedTables: [],
+        matchedFields: [],
+        tableStructures: [],
+      };
+    }
   }
 }
