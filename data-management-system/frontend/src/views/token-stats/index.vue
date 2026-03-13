@@ -19,6 +19,7 @@ const loading = ref(false)
 // 趋势数据
 const trendData = ref<TrendItem[]>([])
 const trendDays = ref(7)
+const hoveredBar = ref<number | null>(null)
 
 // 分模型统计
 const modelStats = ref<ModelStats[]>([])
@@ -161,8 +162,9 @@ const formatShortDate = (dateStr: string) => {
 
 // 计算趋势图最大值
 const maxTokens = computed(() => {
-  if (!trendData.value.length) return 100
-  return Math.max(...trendData.value.map(d => d.tokens)) * 1.1
+  if (!trendData.value.length) return 1
+  const max = Math.max(...trendData.value.map(d => d.tokens))
+  return max || 1
 })
 
 // 切换趋势天数
@@ -256,21 +258,29 @@ onMounted(() => {
             </button>
           </div>
         </div>
-        <div v-if="trendData.length === 0" class="h-48 flex items-center justify-center text-gray-400">
+        <div v-if="trendData.length === 0" class="h-64 flex items-center justify-center text-gray-400">
           暂无数据
         </div>
-        <div v-else class="h-48 flex items-end gap-2">
+        <div v-else class="h-64 flex items-end gap-2 pt-8 relative">
+          <!-- 悬浮提示框 -->
+          <div
+            v-if="hoveredBar !== null"
+            class="absolute top-0 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10"
+          >
+            {{ formatShortDate(trendData[hoveredBar].date) }}: {{ formatNumber(trendData[hoveredBar].tokens) }} tokens
+          </div>
           <div
             v-for="(item, index) in trendData"
             :key="index"
-            class="flex-1 flex flex-col items-center"
+            class="flex-1 flex flex-col items-center group cursor-pointer h-full justify-end"
+            @mouseenter="hoveredBar = index"
+            @mouseleave="hoveredBar = null"
           >
             <div
-              class="w-full bg-primary/80 rounded-t transition-all hover:bg-primary"
-              :style="{ height: `${(item.tokens / maxTokens) * 100}%`, minHeight: '4px' }"
-              :title="`${formatShortDate(item.date)}: ${formatNumber(item.tokens)} tokens`"
+              class="w-full bg-gradient-to-t from-primary to-primary/60 rounded-t transition-all duration-300 ease-out hover:from-primary hover:to-primary/80 shadow-sm hover:shadow-md"
+              :style="{ flex: `${Math.max(item.tokens / maxTokens, 0.1)} 0 auto` }"
             ></div>
-            <span class="text-xs text-gray-400 mt-1 truncate w-full text-center">
+            <span class="text-xs text-gray-400 mt-1 truncate w-full text-center group-hover:text-gray-600 transition-colors">
               {{ formatShortDate(item.date) }}
             </span>
           </div>
@@ -423,3 +433,5 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+
