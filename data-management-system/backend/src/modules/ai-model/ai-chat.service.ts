@@ -79,7 +79,7 @@ const SYSTEM_PROMPT = `你是一个数据管理助手，可以帮助用户管理
 4. 思考如何呈现结果
 </thinking>
 
-然后给出最终回答。
+**重要：思考结束后，必须给出最终回答！** 不要只输出思考过程，必须在 </thinking> 标签后面给出对用户有用的回复内容。
 
 ## 示例
 用户：查询所有用户数据
@@ -143,7 +143,7 @@ const SYSTEM_PROMPT_WITH_KNOWLEDGE = `你是一个数据管理助手，可以帮
 4. 思考如何呈现结果
 </thinking>
 
-然后给出最终回答。
+**重要：思考结束后，必须给出最终回答！** 不要只输出思考过程，必须在 </thinking> 标签后面给出对用户有用的回复内容。
 
 ## 重要工作流程
 
@@ -313,15 +313,26 @@ export class AIChatService {
 
   /**
    * 解析思考步骤
-   * 从回复内容中提取 <thinking> 标签包裹的内容
+   * 从回复内容中提取 <thinking> 标签包裹的内容（支持多个块，大小写不敏感）
    */
   private parseThinking(content: string): { thinking?: string; content: string } {
-    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/;
-    const match = content.match(thinkingRegex);
+    // 大小写不敏感匹配所有 thinking 块
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/gi;
+    const matches = content.match(thinkingRegex);
     
-    if (match) {
-      const thinking = match[1].trim();
-      // 移除 thinking 标签，保留其他内容
+    if (matches && matches.length > 0) {
+      // 提取所有 thinking 内容（去除标签）
+      const thinkingParts: string[] = [];
+      for (const match of matches) {
+        // 提取标签内的内容
+        const innerMatch = match.match(/<thinking>([\s\S]*)<\/thinking>/i);
+        if (innerMatch) {
+          thinkingParts.push(innerMatch[1].trim());
+        }
+      }
+      
+      const thinking = thinkingParts.join('\n\n');
+      // 移除所有 thinking 标签块，保留其他内容
       const finalContent = content.replace(thinkingRegex, '').trim();
       return { thinking, content: finalContent };
     }
@@ -799,6 +810,8 @@ export class AIChatService {
       content: dto.content,
     });
     await this.chatRepository.save(userMessage);
+    // 保存用户消息的实际创建时间
+    const userMessageCreatedAt = userMessage.createdAt;
 
     // 获取历史消息作为上下文
     const contextLength = model.parameters?.contextLength || 20;
@@ -902,14 +915,6 @@ export class AIChatService {
       }
     }
 
-    // 发送完成事件
-    subject.next({
-      type: 'done',
-      data: JSON.stringify({
-        sessionId,
-        tokens: { input: totalInputTokens, output: totalOutputTokens },
-      }),
-    } as MessageEvent);
 
     // 保存AI回复
     const assistantMessage = this.chatRepository.create({
@@ -921,6 +926,24 @@ export class AIChatService {
       thinking: fullThinking || null,
     });
     await this.chatRepository.save(assistantMessage);
+
+    // 发送完成事件（包含消息的实际创建时间）
+    subject.next({
+      type: 'done',
+      data: JSON.stringify({
+        sessionId,
+        tokens: { input: totalInputTokens, output: totalOutputTokens },
+        // 返回消息的实际创建时间
+        userMessage: {
+          chatId: userMessage.chatId,
+          createdAt: userMessageCreatedAt,
+        },
+        assistantMessage: {
+          chatId: assistantMessage.chatId,
+          createdAt: assistantMessage.createdAt,
+        },
+      }),
+    } as MessageEvent);
 
     // 记录Token消耗
     await this.recordTokenUsage(model.modelId, sessionId, totalInputTokens, totalOutputTokens);
@@ -1006,6 +1029,10 @@ export class AIChatService {
     let toolCalls: any[] = [];
     let rawToolCalls: any[] = [];
 
+    // 用于跟踪是否在 thinking 标签内部
+    let isInThinking = false;
+    let thinkingBuffer = '';
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -1059,13 +1086,81 @@ export class AIChatService {
               } as MessageEvent);
             }
 
-            // 处理正常内容
+            // 处理正常内容（需要实时过滤 thinking 标签）
             if (delta.content) {
-              fullContent += delta.content;
-              subject.next({
-                type: 'content',
-                data: JSON.stringify({ content: delta.content }),
-              } as MessageEvent);
+              thinkingBuffer += delta.content;
+
+              // 调试：显示当前 buffer 内容
+              if (thinkingBuffer.length < 300) {
+                console.log(`[Thinking Debug] Buffer: "${thinkingBuffer.replace(/\n/g, '\\n')}", isInThinking: ${isInThinking}`);
+              }
+
+              // 实时处理 thinking 标签（大小写不敏感，允许标签内有空格）
+              while (thinkingBuffer.length > 0) {
+                if (isInThinking) {
+                  // 在 thinking 内部，查找结束标签（大小写不敏感）
+                  // 使用正则匹配，允许标签内有空格，如 </thinking > 或 </ thinking>
+                  const endMatch = thinkingBuffer.match(/<\/\s*thinking\s*>/i);
+                  if (endMatch) {
+                    const endIdx = endMatch.index!;
+                    const endTagLength = endMatch[0].length;
+                    // 找到结束标签，提取思考内容（不含标签）
+                    const thinkingContent = thinkingBuffer.substring(0, endIdx);
+                    console.log(`[Thinking] Found end tag, content length: ${thinkingContent.length}`);
+                    fullThinking += thinkingContent;
+                    subject.next({
+                      type: 'thinking',
+                      data: JSON.stringify({ content: thinkingContent }),
+                    } as MessageEvent);
+
+                    // 移除已处理的部分（包括结束标签）
+                    thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
+                    isInThinking = false;
+                    console.log(`[Thinking] Exited thinking mode, remaining: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+
+                    // 过滤掉标签后的空白字符
+                    const leadingNewlines = thinkingBuffer.match(/^[\n\r\s]+/);
+                    if (leadingNewlines) {
+                      thinkingBuffer = thinkingBuffer.substring(leadingNewlines[0].length);
+                    }
+                  } else {
+                    // 还没找到结束标签，缓存内容等待
+                    break;
+                  }
+                } else {
+                  // 不在 thinking 内部，查找开始标签（大小写不敏感，允许标签内有空格）
+                  const startMatch = thinkingBuffer.match(/<\s*thinking\s*>/i);
+                  if (startMatch) {
+                    const startIdx = startMatch.index!;
+                    const startTagLength = startMatch[0].length;
+                    console.log(`[Thinking] Found start tag at position: ${startIdx}, tag: "${startMatch[0]}"`);
+                    // 找到开始标签，先发送之前的内容
+                    if (startIdx > 0) {
+                      const content = thinkingBuffer.substring(0, startIdx);
+                      console.log(`[Content] Sending content before thinking: "${content.substring(0, 50)}..."`);
+                      fullContent += content;
+                      subject.next({
+                        type: 'content',
+                        data: JSON.stringify({ content }),
+                      } as MessageEvent);
+                    }
+
+                    // 移除开始标签，进入 thinking 模式
+                    thinkingBuffer = thinkingBuffer.substring(startIdx + startTagLength);
+                    isInThinking = true;
+                    console.log(`[Thinking] Entered thinking mode, remaining buffer: "${thinkingBuffer.substring(0, 30).replace(/\n/g, '\\n')}..."`);
+                  } else {
+                    // 没有找到开始标签，全部作为正常内容
+                    console.log(`[Content] Sending all buffer as content: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+                    fullContent += thinkingBuffer;
+                    subject.next({
+                      type: 'content',
+                      data: JSON.stringify({ content: thinkingBuffer }),
+                    } as MessageEvent);
+                    thinkingBuffer = '';
+                  }
+                }
+              }
             }
 
             // 处理工具调用（流式中可能分多次发送）
@@ -1097,6 +1192,72 @@ export class AIChatService {
       }
     } finally {
       reader.releaseLock();
+    }
+
+    // 处理残留的 buffer（流结束时可能还有未处理的内容）
+    console.log(`[Thinking] Stream ended, buffer length: ${thinkingBuffer.length}, isInThinking: ${isInThinking}`);
+    if (thinkingBuffer.length > 0) {
+      // 继续处理 thinking 标签（流结束后也需要检测）
+      while (thinkingBuffer.length > 0) {
+        if (isInThinking) {
+          console.log(`[Thinking] Looking for end tag in: "${thinkingBuffer.substring(0, 100).replace(/\n/g, '\\n')}"`);
+          // 在 thinking 内部，查找结束标签（使用正则，允许标签内有空格）
+          const endMatch = thinkingBuffer.match(/<\/\s*thinking\s*>/i);
+          if (endMatch) {
+            console.log(`[Thinking] Found end tag in final buffer: "${endMatch[0]}"`);
+            const endIdx = endMatch.index!;
+            const endTagLength = endMatch[0].length;
+            const thinkingContent = thinkingBuffer.substring(0, endIdx);
+            fullThinking += thinkingContent;
+            subject.next({
+              type: 'thinking',
+              data: JSON.stringify({ content: thinkingContent }),
+            } as MessageEvent);
+            thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
+            isInThinking = false;
+            console.log(`[Thinking] Exited thinking mode (final), remaining buffer: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}"`);
+            // 过滤空白
+            const leadingNewlines = thinkingBuffer.match(/^[\n\r\s]+/);
+            if (leadingNewlines) {
+              thinkingBuffer = thinkingBuffer.substring(leadingNewlines[0].length);
+            }
+          } else {
+            // 没有结束标签，全部作为思考内容
+            console.log(`[Thinking] No end tag found, treating all as thinking content`);
+            fullThinking += thinkingBuffer;
+            subject.next({
+              type: 'thinking',
+              data: JSON.stringify({ content: thinkingBuffer }),
+            } as MessageEvent);
+            thinkingBuffer = '';
+          }
+        } else {
+          // 不在 thinking 内部，查找开始标签（使用正则，允许标签内有空格）
+          const startMatch = thinkingBuffer.match(/<\s*thinking\s*>/i);
+          if (startMatch) {
+            const startIdx = startMatch.index!;
+            const startTagLength = startMatch[0].length;
+            if (startIdx > 0) {
+              const content = thinkingBuffer.substring(0, startIdx);
+              fullContent += content;
+              subject.next({
+                type: 'content',
+                data: JSON.stringify({ content }),
+              } as MessageEvent);
+            }
+            thinkingBuffer = thinkingBuffer.substring(startIdx + startTagLength);
+            isInThinking = true;
+          } else {
+            // 没有开始标签，全部作为正常内容
+            fullContent += thinkingBuffer;
+            subject.next({
+              type: 'content',
+              data: JSON.stringify({ content: thinkingBuffer }),
+            } as MessageEvent);
+            thinkingBuffer = '';
+          }
+        }
+      }
     }
 
     // 回调收集的内容

@@ -6,6 +6,7 @@
  */
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed, onUnmounted, watch } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { Send, Bot, User, Plus, Trash2, MessageSquare, BookOpen, Square, Copy, Check, Brain, ChevronDown, ChevronUp, Table } from 'lucide-vue-next'
 import { getEnabledModels, streamMessage, getSessionList, deleteSession, getChatHistory } from '@/api/ai-model'
 import { getTableList } from '@/api/table-meta'
@@ -231,6 +232,8 @@ const handleSendMessage = async () => {
     return
   }
 
+  // 保存用户消息索引，用于后续更新时间
+  const userMessageIndex = messages.value.length
   const userMessage: ChatMessage = {
     chatId: '',
     modelId: selectedModel.value,
@@ -298,6 +301,15 @@ const handleSendMessage = async () => {
         })
       },
       onDone: (data) => {
+        // 更新消息的实际创建时间（从服务器返回）
+        if (data.userMessage) {
+          messages.value[userMessageIndex].chatId = data.userMessage.chatId
+          messages.value[userMessageIndex].createdAt = data.userMessage.createdAt
+        }
+        if (data.assistantMessage) {
+          messages.value[aiMessageIndex].chatId = data.assistantMessage.chatId
+          messages.value[aiMessageIndex].createdAt = data.assistantMessage.createdAt
+        }
         loading.value = false
         streamAbort.value = null
         scrollToBottom()
@@ -339,14 +351,52 @@ const clearMessages = () => {
   currentSessionId.value = ''
 }
 
-// 新建会话
+// 新建会话（对话中时需要确认）
 const newSession = () => {
+  if (loading.value) {
+    if (!confirm('AI正在回复中，确定要终止对话并新建会话吗？')) {
+      return
+    }
+    // 终止当前对话
+    stopStream()
+  }
   messages.value = []
   currentSessionId.value = ''
 }
 
-// 加载会话消息
+// 页面离开确认（刷新/关闭页面）
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (loading.value) {
+    e.preventDefault()
+    e.returnValue = 'AI正在回复中，确定要离开吗？'
+    return e.returnValue
+  }
+}
+
+// 路由跳转确认（点击菜单栏等）
+onBeforeRouteLeave((to, from, next) => {
+  if (loading.value) {
+    if (confirm('AI正在回复中，确定要终止对话并离开吗？')) {
+      stopStream()
+      next()
+    } else {
+      next(false)
+    }
+  } else {
+    next()
+  }
+})
+
+// 加载会话消息（对话中时需要确认）
 const loadSessionMessages = async (session: any) => {
+  // 对话中时确认是否切换会话
+  if (loading.value) {
+    if (!confirm('AI正在回复中，确定要终止对话并切换会话吗？')) {
+      return
+    }
+    // 终止当前对话
+    stopStream()
+  }
   currentSessionId.value = session.sessionId
   try {
     const res = await getChatHistory(session.sessionId)
@@ -393,10 +443,10 @@ const confirmDeleteSession = async () => {
   }
 }
 
-// 格式化时间
+// 格式化时间（包含时分秒）
 const formatTime = (dateStr: string) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 // 工具名称映射
@@ -469,6 +519,8 @@ onMounted(() => {
   loadTableList()
   // 添加点击外部关闭提及列表的监听
   document.addEventListener('click', handleClickOutside)
+  // 添加页面离开事件监听
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 // 组件卸载时取消pending请求
@@ -478,6 +530,8 @@ onUnmounted(() => {
   }
   // 移除点击监听
   document.removeEventListener('click', handleClickOutside)
+  // 移除页面离开事件监听
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
 

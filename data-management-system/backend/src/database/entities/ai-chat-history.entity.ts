@@ -2,13 +2,14 @@
  * AI对话历史实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 import {
   Entity,
   Column,
   PrimaryColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
   Index,
@@ -46,6 +47,10 @@ export class AIChatHistory {
   // 创建时间
   @CreateDateColumn()
   createdAt: Date;
+
+  // 更新时间
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // 关联模型配置
   @ManyToOne(() => AIModelConfig)

@@ -2,9 +2,9 @@
  * AI模型相关DTO
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, MaxLength, IsUrl, IsDateString } from 'class-validator';
 
 // 模型类型枚举
 export enum ModelTypeEnum {
@@ -122,4 +122,42 @@ export class TestConnectionByIdDto {
   @IsString()
   @IsNotEmpty()
   modelId: string;
+}
+
+// 创建模型定价DTO
+export class CreateModelPricingDto {
+  @IsNumber()
+  @IsNotEmpty({ message: '输入价格不能为空' })
+  inputPrice: number;
+
+  @IsNumber()
+  @IsNotEmpty({ message: '输出价格不能为空' })
+  outputPrice: number;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsDateString()
+  @IsOptional()
+  effectiveDate?: string;
+}
+
+// 更新模型定价DTO
+export class UpdateModelPricingDto {
+  @IsNumber()
+  @IsOptional()
+  inputPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  outputPrice?: number;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsDateString()
+  @IsOptional()
+  effectiveDate?: string;
 }

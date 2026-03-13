@@ -120,6 +120,7 @@ async function initDatabase() {
           content TEXT NOT NULL,
           thinking TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_sys_ai_chat_session_id (session_id),
           INDEX idx_sys_ai_chat_model_id (model_id),
           FOREIGN KEY (model_id) REFERENCES sys_ai_model(model_id) ON DELETE CASCADE
@@ -199,6 +200,20 @@ async function initDatabase() {
         console.log(`✅ 迁移成功: 添加 thinking 字段到 sys_ai_chat 表`);
       } else {
         console.log(`ℹ️ 字段 thinking 已存在，跳过迁移`);
+      }
+
+      // 检查 updated_at 字段是否存在
+      const updatedAtColumns = await appDataSource.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'sys_ai_chat' AND COLUMN_NAME = 'updated_at'`,
+        [dbConfig.database]
+      );
+      
+      if (updatedAtColumns.length === 0) {
+        await appDataSource.query(`ALTER TABLE sys_ai_chat ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
+        console.log(`✅ 迁移成功: 添加 updated_at 字段到 sys_ai_chat 表`);
+      } else {
+        console.log(`ℹ️ 字段 updated_at 已存在，跳过迁移`);
       }
     } catch (error: any) {
       console.log(`⚠️ 迁移警告: ${error.message}`);
