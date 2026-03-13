@@ -2,19 +2,23 @@
 * 数据表元数据服务
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-12
+* 更新时间：2026-03-13
 */
-import { Injectable, NotFoundException, ConflictException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { TableDefinition, FieldDefinition } from '@/database/entities';
 import { CreateTableDto, UpdateTableDto, CreateFieldDto, UpdateFieldDto } from './dto';
+import { RedisCacheService } from '../redis-cache';
 
 // 动态数据服务接口，用于解决循环依赖
 export interface IDynamicDataService {
   createDynamicTable(tableId: string): Promise<void>;
 }
+
+// 缓存键前缀
+const CACHE_PREFIX = 'table_meta';
 
 @Injectable()
 export class TableMetaService {
@@ -26,6 +30,7 @@ export class TableMetaService {
     @InjectRepository(FieldDefinition)
     private fieldRepository: Repository<FieldDefinition>,
     private dataSource: DataSource,
+    private readonly cacheService: RedisCacheService,
   ) {}
 
   /**
@@ -36,27 +41,58 @@ export class TableMetaService {
   }
 
   /**
-   * 获取所有数据表列表
+   * 获取所有数据表列表（带缓存）
    */
   async findAllTables(): Promise<TableDefinition[]> {
-    return this.tableRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+    const cacheKey = RedisCacheService.buildKey(CACHE_PREFIX, 'all_tables');
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        return this.tableRepository.find({
+          order: { createdAt: 'DESC' },
+        });
+      },
+      300, // 缓存5分钟
+    );
   }
 
   /**
-   * 获取数据表详情（包含字段）
+   * 获取数据表详情（包含字段，带缓存）
    */
   async findTableById(tableId: string): Promise<TableDefinition> {
+    const cacheKey = RedisCacheService.buildKey(CACHE_PREFIX, 'table', tableId);
+    
+    const cached = await this.cacheService.get<TableDefinition>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const table = await this.tableRepository.findOne({
       where: { tableId },
       relations: ['fields'],
       order: { fields: { sortOrder: 'ASC' } },
     });
+    
     if (!table) {
       throw new NotFoundException(`数据表 ${tableId} 不存在`);
     }
+    
+    // 缓存表结构，10分钟
+    await this.cacheService.set(cacheKey, table, 600);
     return table;
+  }
+
+  /**
+   * 清除表相关缓存
+   */
+  private async clearTableCache(tableId?: string): Promise<void> {
+    // 清除表列表缓存
+    await this.cacheService.del(RedisCacheService.buildKey(CACHE_PREFIX, 'all_tables'));
+    
+    // 清除特定表缓存
+    if (tableId) {
+      await this.cacheService.del(RedisCacheService.buildKey(CACHE_PREFIX, 'table', tableId));
+    }
   }
 
   /**
@@ -97,7 +133,10 @@ export class TableMetaService {
       );
     }
 
-    return this.tableRepository.save(table);
+    const savedTable = await this.tableRepository.save(table);
+    // 清除表列表缓存
+    await this.clearTableCache();
+    return savedTable;
   }
 
   /**
@@ -106,7 +145,10 @@ export class TableMetaService {
   async updateTable(tableId: string, dto: UpdateTableDto): Promise<TableDefinition> {
     const table = await this.findTableById(tableId);
     Object.assign(table, dto);
-    return this.tableRepository.save(table);
+    const savedTable = await this.tableRepository.save(table);
+    // 清除该表缓存
+    await this.clearTableCache(tableId);
+    return savedTable;
   }
 
   /**
@@ -130,6 +172,9 @@ export class TableMetaService {
       // 再删除表元数据
       await manager.delete(TableDefinition, { tableId });
     });
+    
+    // 清除缓存
+    await this.clearTableCache(tableId);
   }
 
   /**
@@ -163,7 +208,10 @@ export class TableMetaService {
       sortOrder: dto.sortOrder || 0,
     });
 
-    return this.fieldRepository.save(field);
+    const savedField = await this.fieldRepository.save(field);
+    // 清除该表缓存
+    await this.clearTableCache(tableId);
+    return savedField;
   }
 
   /**
@@ -178,6 +226,9 @@ export class TableMetaService {
     }
     Object.assign(field, dto);
     const savedField = await this.fieldRepository.save(field);
+
+    // 清除该表缓存
+    await this.clearTableCache(field.tableId);
 
     // 同步表结构（如果字段类型等关键属性变更）
     if (this.dynamicDataService && (dto.fieldType || dto.length || dto.decimalPlaces || dto.required)) {
@@ -197,7 +248,10 @@ export class TableMetaService {
     if (!field) {
       throw new NotFoundException(`字段 ${fieldId} 不存在`);
     }
+    const tableId = field.tableId;
     await this.fieldRepository.remove(field);
+    // 清除该表缓存
+    await this.clearTableCache(tableId);
   }
 
   /**

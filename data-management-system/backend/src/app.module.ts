@@ -2,7 +2,7 @@
 * NestJS 根模块
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-12
+* 更新时间：2026-03-13
 */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -15,6 +15,7 @@ import { AIModelModule } from './modules/ai-model';
 import { TokenUsageModule } from './modules/token-usage';
 import { ViewConfigModule } from './modules/view-config';
 import { KnowledgeBaseModule } from './modules/knowledge-base';
+import { RedisCacheModule } from './modules/redis-cache';
 
 @Module({
   imports: [
@@ -23,6 +24,9 @@ import { KnowledgeBaseModule } from './modules/knowledge-base';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    
+    // Redis缓存模块
+    RedisCacheModule,
     
     // 数据库连接
     TypeOrmModule.forRootAsync({
