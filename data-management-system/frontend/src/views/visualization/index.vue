@@ -61,12 +61,14 @@ const tableData = ref<any[]>([])
 
 // 图表配置
 const chartConfig = ref({
-  dateField: '',      // 日期字段
   timeRange: '30d',   // 时间范围
   groupBy: 'day',     // 分组方式
   yAxis: '',          // Y轴数值字段
   categoryField: '',  // 分类字段（可选，用于分组对比）
 })
+
+// X轴固定使用创建时间字段
+const xAxisField = 'created_at'
 
 // 筛选条件
 const filters = ref<FilterCondition[]>([])
@@ -132,14 +134,6 @@ const validateFieldName = (fieldName: string, fieldList: FieldDefinition[]): boo
 const loadTableData = async (tableId: string) => {
   loading.value = true
   try {
-    // 验证日期字段是否存在
-    if (chartConfig.value.dateField && !validateFieldName(chartConfig.value.dateField, tableFields.value)) {
-      console.warn(`日期字段 "${chartConfig.value.dateField}" 不存在，已重置`)
-      chartConfig.value.dateField = ''
-      tableData.value = []
-      return
-    }
-    
     // 验证Y轴字段是否存在
     if (chartConfig.value.yAxis && !validateFieldName(chartConfig.value.yAxis, tableFields.value)) {
       console.warn(`数值字段 "${chartConfig.value.yAxis}" 不存在，已重置`)
@@ -151,12 +145,12 @@ const loadTableData = async (tableId: string) => {
     // 构建筛选条件
     const allFilters: FilterCondition[] = []
     
-    // 添加时间范围筛选（仅对非系统字段使用筛选条件）
-    if (chartConfig.value.dateField && chartConfig.value.timeRange !== 'all') {
+    // 添加时间范围筛选（使用 created_at 字段）
+    if (chartConfig.value.timeRange !== 'all') {
       const startDate = getStartDate(chartConfig.value.timeRange)
       if (startDate) {
         allFilters.push({
-          field: chartConfig.value.dateField,
+          field: xAxisField,
           operator: 'gte',
           value: startDate.toISOString()
         })
@@ -215,16 +209,8 @@ const applyView = (view: ViewConfig) => {
   
   // 从视图配置中恢复设置
   if (view.xAxis) {
-    // xAxis 格式: "dateField|timeRange|groupBy"
-    const [dateField, timeRange, groupBy] = view.xAxis.split('|')
-    
-    // 验证日期字段是否存在
-    if (validateFieldName(dateField, tableFields.value)) {
-      chartConfig.value.dateField = dateField || ''
-    } else {
-      console.warn(`视图配置中的日期字段 "${dateField}" 已不存在`)
-      chartConfig.value.dateField = ''
-    }
+    // xAxis 格式: "timeRange|groupBy"
+    const [timeRange, groupBy] = view.xAxis.split('|')
     chartConfig.value.timeRange = timeRange || '30d'
     chartConfig.value.groupBy = groupBy || 'day'
   }
@@ -254,7 +240,6 @@ const applyView = (view: ViewConfig) => {
 watch(selectedTable, async (val) => {
   if (val) {
     // 重置配置
-    chartConfig.value.dateField = ''
     chartConfig.value.yAxis = ''
     tableData.value = []
     
@@ -270,7 +255,7 @@ watch(selectedTable, async (val) => {
     }
     
     // 确保有配置后才加载数据
-    if (chartConfig.value.dateField && chartConfig.value.yAxis) {
+    if (chartConfig.value.yAxis) {
       await loadTableData(val)
     }
   } else {
@@ -279,39 +264,18 @@ watch(selectedTable, async (val) => {
     viewList.value = []
     selectedView.value = null
     filters.value = []
-    chartConfig.value.dateField = ''
     chartConfig.value.yAxis = ''
   }
 })
 
 // 自动选择字段
 const autoSelectFields = () => {
-  // 优先选择用户定义的日期字段，否则选择创建时间
-  const userDateFields = tableFields.value.filter(f => ['date', 'datetime'].includes(f.fieldType))
-  if (userDateFields.length > 0) {
-    chartConfig.value.dateField = userDateFields[0].fieldName
-  } else {
-    // 默认使用创建时间
-    chartConfig.value.dateField = 'created_at'
-  }
-  
   // 选择数值字段
   const numericFields = tableFields.value.filter(f => ['int', 'bigint', 'float', 'double', 'decimal'].includes(f.fieldType))
   if (numericFields.length > 0) {
     chartConfig.value.yAxis = numericFields[0].fieldName
   }
 }
-
-// 日期字段（包含系统字段）
-const dateFields = computed(() => {
-  const fields = tableFields.value.filter(f => ['date', 'datetime'].includes(f.fieldType))
-  // 添加系统日期字段（确保类型兼容）
-  const sysFields: FieldDefinition[] = [
-    { fieldId: 'sys_created_at', tableId: '', fieldName: 'created_at', displayName: '创建时间', fieldType: 'datetime', required: false, sortOrder: 0, createdAt: '' },
-    { fieldId: 'sys_updated_at', tableId: '', fieldName: 'updated_at', displayName: '更新时间', fieldType: 'datetime', required: false, sortOrder: 0, createdAt: '' },
-  ]
-  return [...fields, ...sysFields]
-})
 
 // 可作为Y轴的字段（数字类型，用于统计数值）
 const yAxisFields = computed(() => {
@@ -385,7 +349,7 @@ const getDateGroupKey = (dateValue: any, groupBy: string): string => {
 
 // 生成图表数据
 const chartData = computed(() => {
-  if (!chartConfig.value.dateField || !chartConfig.value.yAxis || tableData.value.length === 0) {
+  if (!chartConfig.value.yAxis || tableData.value.length === 0) {
     return { labels: [], values: [] }
   }
 
@@ -394,13 +358,13 @@ const chartData = computed(() => {
   
   // 按日期排序的数据
   const sortedData = [...tableData.value].sort((a, b) => {
-    const dateA = new Date(a[chartConfig.value.dateField])
-    const dateB = new Date(b[chartConfig.value.dateField])
+    const dateA = new Date(a[xAxisField])
+    const dateB = new Date(b[xAxisField])
     return dateA.getTime() - dateB.getTime()
   })
   
   sortedData.forEach(item => {
-    const key = getDateGroupKey(item[chartConfig.value.dateField], chartConfig.value.groupBy)
+    const key = getDateGroupKey(item[xAxisField], chartConfig.value.groupBy)
     const value = Number(item[chartConfig.value.yAxis]) || 0
     grouped.set(key, (grouped.get(key) || 0) + value)
   })
@@ -485,8 +449,8 @@ const handleSaveView = async () => {
   }
   saveLoading.value = true
   try {
-    // xAxis 格式: "dateField|timeRange|groupBy"
-    const xAxisValue = `${chartConfig.value.dateField}|${chartConfig.value.timeRange}|${chartConfig.value.groupBy}`
+    // xAxis 格式: "timeRange|groupBy"
+    const xAxisValue = `${chartConfig.value.timeRange}|${chartConfig.value.groupBy}`
     
     const data = {
       viewName: saveViewName.value.trim(),
@@ -560,14 +524,14 @@ const confirmDeleteView = async () => {
 let loadDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 // 监听配置变化，防抖加载数据
-watch([() => chartConfig.value.dateField, () => chartConfig.value.timeRange, () => chartConfig.value.groupBy, () => chartConfig.value.yAxis], () => {
+watch([() => chartConfig.value.timeRange, () => chartConfig.value.groupBy, () => chartConfig.value.yAxis], () => {
   // 清除之前的定时器
   if (loadDebounceTimer) {
     clearTimeout(loadDebounceTimer)
   }
   // 防抖加载，确保配置完整
   loadDebounceTimer = setTimeout(() => {
-    if (selectedTable.value && chartConfig.value.dateField && chartConfig.value.yAxis) {
+    if (selectedTable.value && chartConfig.value.yAxis) {
       loadTableData(selectedTable.value)
     }
   }, 300)
@@ -689,20 +653,6 @@ onMounted(() => {
         <div v-if="selectedTable && tableFields.length > 0" class="bg-white rounded-xl shadow-sm p-4">
           <h3 class="text-sm font-medium text-gray-800 mb-3">字段配置</h3>
           <div class="space-y-3">
-            <!-- 日期字段 -->
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">日期字段</label>
-              <select
-                v-model="chartConfig.dateField"
-                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                <option value="">请选择日期字段</option>
-                <option v-for="field in dateFields" :key="field.fieldId" :value="field.fieldName">
-                  {{ field.displayName }}
-                </option>
-              </select>
-            </div>
-            
             <!-- 时间范围（X轴） -->
             <div>
               <label class="block text-xs text-gray-500 mb-1">X轴 - 时间范围</label>
@@ -828,7 +778,6 @@ onMounted(() => {
           <div class="text-center">
             <BarChart3 class="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p v-if="!selectedTable">请选择数据表</p>
-            <p v-else-if="!chartConfig.dateField">请选择日期字段</p>
             <p v-else-if="!chartConfig.yAxis">请选择数值字段</p>
             <p v-else>该时间范围内暂无数据</p>
           </div>
