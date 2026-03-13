@@ -2,14 +2,15 @@
  * Token统计页面
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { TrendingUp, DollarSign, Zap, Calendar, ChevronRight, ChevronLeft } from 'lucide-vue-next'
+import { TrendingUp, DollarSign, Zap, Calendar, ChevronRight, ChevronLeft, Filter, X } from 'lucide-vue-next'
 import { getOverview, getTrend, getByModel, getUsageList } from '@/api/token-usage'
-import type { TokenOverview, TrendItem, ModelStats } from '@/api/token-usage'
-import type { TokenUsage } from '@/types'
+import { getEnabledModels } from '@/api/ai-model'
+import type { TokenOverview, TrendItem, ModelStats, QueryTokenUsageDto } from '@/api/token-usage'
+import type { TokenUsage, AIModelConfig } from '@/types'
 
 // 统计概览
 const overview = ref<TokenOverview | null>(null)
@@ -29,6 +30,28 @@ const pagination = ref({
   pageSize: 10,
   total: 0,
 })
+
+// 筛选条件
+const modelList = ref<AIModelConfig[]>([])
+const filterModelId = ref<string>('')
+const filterStartDate = ref<string>('')
+const filterEndDate = ref<string>('')
+const showFilter = ref(false)
+
+// 是否有筛选条件
+const hasFilter = computed(() => {
+  return filterModelId.value || filterStartDate.value || filterEndDate.value
+})
+
+// 加载模型列表
+const loadModelList = async () => {
+  try {
+    const res = await getEnabledModels()
+    modelList.value = res.data || []
+  } catch (error) {
+    console.error('加载模型列表失败:', error)
+  }
+}
 
 // 加载概览数据
 const loadOverview = async () => {
@@ -64,10 +87,20 @@ const loadModelStats = async () => {
 const loadUsageList = async () => {
   loading.value = true
   try {
-    const res = await getUsageList({
+    const params: QueryTokenUsageDto = {
       page: pagination.value.page,
       pageSize: pagination.value.pageSize,
-    })
+    }
+    if (filterModelId.value) {
+      params.modelId = filterModelId.value
+    }
+    if (filterStartDate.value) {
+      params.startDate = filterStartDate.value
+    }
+    if (filterEndDate.value) {
+      params.endDate = filterEndDate.value
+    }
+    const res = await getUsageList(params)
     usageList.value = res.data?.list || []
     pagination.value.total = res.data?.total || 0
   } catch (error) {
@@ -75,6 +108,21 @@ const loadUsageList = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 应用筛选
+const applyFilter = () => {
+  pagination.value.page = 1
+  loadUsageList()
+}
+
+// 清除筛选
+const clearFilter = () => {
+  filterModelId.value = ''
+  filterStartDate.value = ''
+  filterEndDate.value = ''
+  pagination.value.page = 1
+  loadUsageList()
 }
 
 // 分页
@@ -124,6 +172,7 @@ const changeTrendDays = (days: number) => {
 }
 
 onMounted(() => {
+  loadModelList()
   loadOverview()
   loadTrend()
   loadModelStats()
@@ -258,8 +307,65 @@ onMounted(() => {
 
     <!-- 消耗明细 -->
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h3 class="font-semibold text-gray-800">消耗明细</h3>
+        <button
+          class="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          @click="showFilter = !showFilter"
+        >
+          <Filter class="w-4 h-4" />
+          筛选
+          <span v-if="hasFilter" class="w-2 h-2 bg-primary rounded-full"></span>
+        </button>
+      </div>
+      <!-- 筛选区域 -->
+      <div v-if="showFilter" class="px-6 py-4 bg-gray-50 border-b border-gray-100">
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">模型</label>
+            <select
+              v-model="filterModelId"
+              class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">全部模型</option>
+              <option v-for="model in modelList" :key="model.modelId" :value="model.modelId">
+                {{ model.modelName }}
+              </option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">开始日期</label>
+            <input
+              v-model="filterStartDate"
+              type="date"
+              class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500">结束日期</label>
+            <input
+              v-model="filterEndDate"
+              type="date"
+              class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              @click="applyFilter"
+            >
+              应用
+            </button>
+            <button
+              v-if="hasFilter"
+              class="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"
+              @click="clearFilter"
+            >
+              <X class="w-4 h-4" />
+              清除
+            </button>
+          </div>
+        </div>
       </div>
       <div v-if="loading" class="p-8 text-center text-gray-500">
         加载中...
@@ -281,7 +387,7 @@ onMounted(() => {
         <tbody class="divide-y divide-gray-100">
           <tr v-for="item in usageList" :key="item.usageId" class="hover:bg-gray-50">
             <td class="px-6 py-3 text-sm text-gray-500">{{ formatDate(item.createdAt) }}</td>
-            <td class="px-6 py-3 text-sm text-gray-800">{{ item.modelId }}</td>
+            <td class="px-6 py-3 text-sm text-gray-800">{{ item.model?.modelName || item.modelId }}</td>
             <td class="px-6 py-3 text-sm text-gray-800 text-right">{{ item.inputTokens.toLocaleString() }}</td>
             <td class="px-6 py-3 text-sm text-gray-800 text-right">{{ item.outputTokens.toLocaleString() }}</td>
             <td class="px-6 py-3 text-sm text-gray-800 text-right font-medium">{{ item.totalTokens.toLocaleString() }}</td>

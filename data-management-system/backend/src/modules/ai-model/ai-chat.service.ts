@@ -2,14 +2,14 @@
  * AI对话服务
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Observable, Subject } from 'rxjs';
-import { AIModelConfig, AIChatHistory, TokenUsage } from '@/database/entities';
+import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing } from '@/database/entities';
 import { AIModelService } from './ai-model.service';
 import { AIToolsService } from './ai-tools.service';
 import { SendMessageDto, GetChatHistoryDto, ThinkingType } from './dto';
@@ -116,6 +116,8 @@ export class AIChatService {
     private chatRepository: Repository<AIChatHistory>,
     @InjectRepository(TokenUsage)
     private tokenUsageRepository: Repository<TokenUsage>,
+    @InjectRepository(AIModelPricing)
+    private pricingRepository: Repository<AIModelPricing>,
     private modelService: AIModelService,
     private toolsService: AIToolsService,
   ) {}
@@ -587,6 +589,10 @@ export class AIChatService {
   /**
    * 记录Token消耗
    */
+  /**
+   * 记录 Token 使用情况
+   * 根据模型定价配置计算实际费用
+   */
   private async recordTokenUsage(
     modelId: string,
     sessionId: string,
@@ -594,7 +600,23 @@ export class AIChatService {
     outputTokens: number,
   ): Promise<void> {
     const totalTokens = inputTokens + outputTokens;
-    
+
+    // 查询模型定价配置（取最新的有效配置）
+    const pricing = await this.pricingRepository.findOne({
+      where: { modelId },
+      order: { effectiveDate: 'DESC' },
+    });
+
+    // 计算费用（元）
+    let estimatedCost = 0;
+    if (pricing) {
+      // 输入费用 = (输入 tokens / 1000) * 输入单价
+      const inputCost = (inputTokens / 1000) * pricing.inputPrice;
+      // 输出费用 = (输出 tokens / 1000) * 输出单价
+      const outputCost = (outputTokens / 1000) * pricing.outputPrice;
+      estimatedCost = inputCost + outputCost;
+    }
+
     const usage = this.tokenUsageRepository.create({
       usageId: uuidv4(),
       modelId,
@@ -602,7 +624,7 @@ export class AIChatService {
       inputTokens,
       outputTokens,
       totalTokens,
-      estimatedCost: 0,
+      estimatedCost,
     });
 
     await this.tokenUsageRepository.save(usage);

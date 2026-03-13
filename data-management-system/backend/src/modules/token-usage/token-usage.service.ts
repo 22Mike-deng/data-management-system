@@ -2,7 +2,7 @@
  * Token统计服务
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,6 +24,7 @@ export class TokenUsageService {
 
   /**
    * 获取统计数据概览
+   * 返回：总Token、总费用、今日Token/费用、本月Token/费用、会话数
    */
   async getOverview() {
     const today = new Date();
@@ -32,41 +33,48 @@ export class TokenUsageService {
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
     // 总消耗
-    const totalResult = await this.usageRepository
+    const totalTokensResult = await this.usageRepository
       .createQueryBuilder('usage')
-      .select('SUM(usage.totalTokens)', 'total')
+      .select('SUM(usage.totalTokens)', 'tokens')
+      .addSelect('SUM(usage.estimatedCost)', 'cost')
       .getRawOne();
 
     // 本月消耗
     const monthResult = await this.usageRepository
       .createQueryBuilder('usage')
-      .select('SUM(usage.totalTokens)', 'total')
+      .select('SUM(usage.totalTokens)', 'tokens')
+      .addSelect('SUM(usage.estimatedCost)', 'cost')
       .where('usage.createdAt >= :thisMonthStart', { thisMonthStart })
       .getRawOne();
 
     // 今日消耗
     const todayResult = await this.usageRepository
       .createQueryBuilder('usage')
-      .select('SUM(usage.totalTokens)', 'total')
+      .select('SUM(usage.totalTokens)', 'tokens')
+      .addSelect('SUM(usage.estimatedCost)', 'cost')
       .where('usage.createdAt >= :today', { today })
       .getRawOne();
 
-    // 预估总费用
-    const costResult = await this.usageRepository
+    // 会话数（按 sessionId 去重）
+    const sessionResult = await this.usageRepository
       .createQueryBuilder('usage')
-      .select('SUM(usage.estimatedCost)', 'total')
+      .select('COUNT(DISTINCT usage.sessionId)', 'count')
       .getRawOne();
 
     return {
-      totalTokens: parseInt(totalResult?.total || '0', 10),
-      monthTokens: parseInt(monthResult?.total || '0', 10),
-      todayTokens: parseInt(todayResult?.total || '0', 10),
-      estimatedCost: parseFloat(costResult?.total || '0'),
+      totalTokens: parseInt(totalTokensResult?.tokens || '0', 10),
+      totalCost: parseFloat(totalTokensResult?.cost || '0'),
+      todayTokens: parseInt(todayResult?.tokens || '0', 10),
+      todayCost: parseFloat(todayResult?.cost || '0'),
+      monthTokens: parseInt(monthResult?.tokens || '0', 10),
+      monthCost: parseFloat(monthResult?.cost || '0'),
+      sessionCount: parseInt(sessionResult?.count || '0', 10),
     };
   }
 
   /**
    * 获取消耗趋势数据
+   * 返回：日期、Token数、费用、会话数
    */
   async getTrend(days: number = 7) {
     const endDate = new Date();
@@ -76,19 +84,26 @@ export class TokenUsageService {
     const result = await this.usageRepository
       .createQueryBuilder('usage')
       .select('DATE(usage.createdAt)', 'date')
-      .addSelect('SUM(usage.totalTokens)', 'totalTokens')
-      .addSelect('SUM(usage.inputTokens)', 'inputTokens')
-      .addSelect('SUM(usage.outputTokens)', 'outputTokens')
+      .addSelect('SUM(usage.totalTokens)', 'tokens')
+      .addSelect('SUM(usage.estimatedCost)', 'cost')
+      .addSelect('COUNT(DISTINCT usage.sessionId)', 'sessions')
       .where('usage.createdAt >= :startDate', { startDate })
       .groupBy('DATE(usage.createdAt)')
       .orderBy('DATE(usage.createdAt)', 'ASC')
       .getRawMany();
 
-    return result;
+    // 转换字段类型
+    return result.map((item) => ({
+      date: item.date,
+      tokens: parseInt(item.tokens || '0', 10),
+      cost: parseFloat(item.cost || '0'),
+      sessions: parseInt(item.sessions || '0', 10),
+    }));
   }
 
   /**
    * 获取分模型统计
+   * 返回：模型ID、模型名称、总Token、总费用、会话数
    */
   async getByModel() {
     const result = await this.usageRepository
@@ -97,14 +112,20 @@ export class TokenUsageService {
       .select('model.modelId', 'modelId')
       .addSelect('model.modelName', 'modelName')
       .addSelect('SUM(usage.totalTokens)', 'totalTokens')
-      .addSelect('SUM(usage.inputTokens)', 'inputTokens')
-      .addSelect('SUM(usage.outputTokens)', 'outputTokens')
-      .addSelect('SUM(usage.estimatedCost)', 'estimatedCost')
+      .addSelect('SUM(usage.estimatedCost)', 'totalCost')
+      .addSelect('COUNT(DISTINCT usage.sessionId)', 'sessionCount')
       .groupBy('model.modelId')
       .addGroupBy('model.modelName')
       .getRawMany();
 
-    return result;
+    // 转换字段类型
+    return result.map((item) => ({
+      modelId: item.modelId,
+      modelName: item.modelName,
+      totalTokens: parseInt(item.totalTokens || '0', 10),
+      totalCost: parseFloat(item.totalCost || '0'),
+      sessionCount: parseInt(item.sessionCount || '0', 10),
+    }));
   }
 
   /**
@@ -136,8 +157,14 @@ export class TokenUsageService {
       .take(pageSize)
       .getMany();
 
+    // 转换 DECIMAL 字段为数字类型（TypeORM 对 DECIMAL 返回字符串）
+    const formattedList = list.map((item) => ({
+      ...item,
+      estimatedCost: parseFloat(String(item.estimatedCost) || '0'),
+    }));
+
     return {
-      list,
+      list: formattedList,
       total,
       page,
       pageSize,

@@ -149,6 +149,12 @@ export interface TokenUsage {
   totalTokens: number
   estimatedCost: number
   createdAt: string
+  // 关联模型信息
+  model?: {
+    modelId: string
+    modelName: string
+    modelType: string
+  }
 }
 
 // API响应类型
