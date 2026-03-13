@@ -8,7 +8,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res } from
 import { Request, Response } from 'express';
 import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
-import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto } from './dto';
+import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto, CreateModelPricingDto, UpdateModelPricingDto } from './dto';
 
 @Controller('ai')
 export class AIModelController {
@@ -259,6 +259,70 @@ export class AIModelController {
     return {
       code: 0,
       message: '删除成功',
+    };
+  }
+
+  // ==================== 模型定价管理 ====================
+
+  /**
+   * 获取所有模型定价配置
+   * GET /api/ai/pricing
+   */
+  @Get('pricing')
+  async getAllPricing() {
+    const pricingList = await this.modelService.getAllPricing();
+    return {
+      code: 0,
+      message: 'success',
+      data: pricingList,
+    };
+  }
+
+  /**
+   * 获取指定模型的定价配置
+   * GET /api/ai/models/:modelId/pricing
+   */
+  @Get('models/:modelId/pricing')
+  async getModelPricing(@Param('modelId') modelId: string) {
+    const pricing = await this.modelService.getPricing(modelId);
+    return {
+      code: 0,
+      message: 'success',
+      data: pricing,
+    };
+  }
+
+  /**
+   * 设置模型定价
+   * POST /api/ai/models/:modelId/pricing
+   */
+  @Post('models/:modelId/pricing')
+  async setModelPricing(
+    @Param('modelId') modelId: string,
+    @Body() dto: CreateModelPricingDto,
+  ) {
+    const pricing = await this.modelService.setPricing(modelId, dto);
+    return {
+      code: 0,
+      message: '定价设置成功',
+      data: pricing,
+    };
+  }
+
+  /**
+   * 更新定价配置
+   * PUT /api/ai/pricing/:pricingId
+   */
+  @Put('pricing/:pricingId')
+  async updatePricing(
+    @Param('pricingId') pricingId: string,
+    @Body() dto: UpdateModelPricingDto,
+  ) {
+    const pricing = await this.modelService.updatePricing(pricingId, dto);
+    return {
+      code: 0,
+      message: '定价更新成功',
+      data: pricing,
     };
   }
 }

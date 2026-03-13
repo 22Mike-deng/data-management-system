@@ -77,7 +77,13 @@ export interface StreamCallbacks {
   onThinking?: (content: string) => void       // 思考过程增量
   onContent?: (content: string) => void        // 回复内容增量
   onToolCall?: (tool: { name: string; arguments: any; success: boolean }) => void
-  onDone?: (data: { sessionId: string; tokens: { input: number; output: number } }) => void
+  onDone?: (data: {
+    sessionId: string
+    tokens: { input: number; output: number }
+    // 消息的实际创建时间
+    userMessage?: { chatId: string; createdAt: string }
+    assistantMessage?: { chatId: string; createdAt: string }
+  }) => void
   onError?: (message: string) => void
 }
 
@@ -190,6 +196,53 @@ export function getSessionList(): Promise<ApiResponse<ChatSession[]>> {
 // 删除会话
 export function deleteSession(sessionId: string): Promise<ApiResponse<void>> {
   return request.delete(`/ai/chat/sessions/${sessionId}`)
+}
+
+// ==================== 模型定价管理 ====================
+
+// 获取所有模型定价配置
+export function getAllPricing(): Promise<ApiResponse<AIModelPricing[]>> {
+  return request.get('/ai/pricing')
+}
+
+// 获取指定模型的定价配置
+export function getModelPricing(modelId: string): Promise<ApiResponse<AIModelPricing | null>> {
+  return request.get(`/ai/models/${modelId}/pricing`)
+}
+
+// 设置模型定价
+export function setModelPricing(modelId: string, data: CreateModelPricingDto): Promise<ApiResponse<AIModelPricing>> {
+  return request.post(`/ai/models/${modelId}/pricing`, data)
+}
+
+// 更新定价配置
+export function updatePricing(pricingId: string, data: UpdateModelPricingDto): Promise<ApiResponse<AIModelPricing>> {
+  return request.put(`/ai/pricing/${pricingId}`, data)
+}
+
+// 定价相关类型
+export interface AIModelPricing {
+  pricingId: string
+  modelId: string
+  inputPrice: number
+  outputPrice: number
+  currency: string
+  effectiveDate: string
+  createdAt: string
+}
+
+export interface CreateModelPricingDto {
+  inputPrice: number
+  outputPrice: number
+  currency?: string
+  effectiveDate?: string
+}
+
+export interface UpdateModelPricingDto {
+  inputPrice?: number
+  outputPrice?: number
+  currency?: string
+  effectiveDate?: string
 }
 
 // DTO类型定义

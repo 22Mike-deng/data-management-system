@@ -2,7 +2,7 @@
  * AI模型管理页面
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-13
  */
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
@@ -16,6 +16,10 @@ import {
   setDefaultModel,
   testConnection,
   testConnectionById,
+  getModelPricing,
+  setModelPricing,
+  updatePricing,
+  type AIModelPricing,
 } from '@/api/ai-model'
 import type { AIModelConfig } from '@/types'
 import Modal from '@/components/Modal.vue'
@@ -48,6 +52,15 @@ const modelForm = ref({
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<AIModelConfig | null>(null)
 const deleteLoading = ref(false)
+
+// 价格设置
+const pricingForm = ref({
+  inputPrice: 0,
+  outputPrice: 0,
+  currency: 'CNY',
+})
+const currentPricing = ref<AIModelPricing | null>(null)
+const pricingLoading = ref(false)
 
 // 测试连接
 const testLoading = ref(false)
@@ -100,6 +113,13 @@ const resetForm = () => {
     contextLength: 20,
   }
   testResult.value = null
+  // 重置价格表单
+  pricingForm.value = {
+    inputPrice: 0,
+    outputPrice: 0,
+    currency: 'CNY',
+  }
+  currentPricing.value = null
 }
 
 // 打开添加弹窗
@@ -113,7 +133,7 @@ const handleAdd = () => {
 }
 
 // 打开编辑弹窗
-const handleEdit = (model: AIModelConfig) => {
+const handleEdit = async (model: AIModelConfig) => {
   modalMode.value = 'edit'
   currentModel.value = model
   modelForm.value = {
@@ -129,6 +149,28 @@ const handleEdit = (model: AIModelConfig) => {
   }
   testResult.value = null
   showModal.value = true
+  
+  // 加载价格配置
+  pricingLoading.value = true
+  try {
+    const res = await getModelPricing(model.modelId)
+    if (res.data) {
+      currentPricing.value = res.data
+      pricingForm.value = {
+        inputPrice: res.data.inputPrice,
+        outputPrice: res.data.outputPrice,
+        currency: res.data.currency || 'CNY',
+      }
+    } else {
+      // 没有价格配置时重置
+      pricingForm.value = { inputPrice: 0, outputPrice: 0, currency: 'CNY' }
+      currentPricing.value = null
+    }
+  } catch (error) {
+    console.error('加载价格配置失败:', error)
+  } finally {
+    pricingLoading.value = false
+  }
 }
 
 // 更新默认端点
@@ -178,11 +220,32 @@ const handleSave = async () => {
       data.apiKey = modelForm.value.apiKey
     }
 
+    let savedModelId: string | null = null
+
     if (modalMode.value === 'create') {
-      await createModel(data)
+      const res = await createModel(data)
+      savedModelId = res.data?.modelId
     } else if (currentModel.value) {
       await updateModel(currentModel.value.modelId, data)
+      savedModelId = currentModel.value.modelId
     }
+
+    // 保存价格配置（仅在编辑模式或创建成功后）
+    if (savedModelId && (pricingForm.value.inputPrice > 0 || pricingForm.value.outputPrice > 0)) {
+      try {
+        if (currentPricing.value) {
+          // 更新现有定价
+          await updatePricing(currentPricing.value.pricingId, pricingForm.value)
+        } else {
+          // 创建新定价
+          await setModelPricing(savedModelId, pricingForm.value)
+        }
+      } catch (error) {
+        console.error('保存价格配置失败:', error)
+        // 价格保存失败不影响整体流程
+      }
+    }
+
     showModal.value = false
     loadModelList()
   } catch (error) {
@@ -548,6 +611,54 @@ onMounted(() => {
               <p class="text-xs text-gray-400 mt-1">记忆消息数</p>
             </div>
           </div>
+        </div>
+
+        <!-- 价格设置 -->
+        <div class="border-t border-gray-100 pt-4">
+          <h4 class="text-sm font-medium text-gray-700 mb-3">模型定价</h4>
+          <div v-if="pricingLoading" class="text-center py-2 text-gray-400 text-sm">
+            加载价格配置中...
+          </div>
+          <div v-else class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">输入价格 (每1K tokens)</label>
+              <div class="relative">
+                <input
+                  v-model.number="pricingForm.inputPrice"
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="0.00"
+                />
+              </div>
+              <p class="text-xs text-gray-400 mt-1">单位: {{ pricingForm.currency }}/1K tokens</p>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">输出价格 (每1K tokens)</label>
+              <input
+                v-model.number="pricingForm.outputPrice"
+                type="number"
+                min="0"
+                step="0.0001"
+                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">货币单位</label>
+              <select
+                v-model="pricingForm.currency"
+                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="CNY">人民币 (CNY)</option>
+                <option value="USD">美元 (USD)</option>
+              </select>
+            </div>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">
+            提示：价格用于计算对话消耗成本，设置为0表示不计算费用
+          </p>
         </div>
 
         <!-- 测试结果 -->

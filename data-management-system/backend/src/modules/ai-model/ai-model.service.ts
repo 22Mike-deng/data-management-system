@@ -2,20 +2,22 @@
  * AI模型管理服务
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { AIModelConfig } from '@/database/entities';
-import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto } from './dto';
+import { AIModelConfig, AIModelPricing } from '@/database/entities';
+import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, CreateModelPricingDto, UpdateModelPricingDto } from './dto';
 
 @Injectable()
 export class AIModelService {
   constructor(
     @InjectRepository(AIModelConfig)
     private modelRepository: Repository<AIModelConfig>,
+    @InjectRepository(AIModelPricing)
+    private pricingRepository: Repository<AIModelPricing>,
   ) {}
 
   /**
@@ -242,5 +244,66 @@ export class AIModelService {
       { isDefault: true },
       { isDefault: false },
     );
+  }
+
+  // ==================== 模型定价管理 ====================
+
+  /**
+   * 获取模型定价配置
+   */
+  async getPricing(modelId: string): Promise<AIModelPricing | null> {
+    return this.pricingRepository.findOne({
+      where: { modelId },
+      order: { effectiveDate: 'DESC' },
+    });
+  }
+
+  /**
+   * 设置模型定价
+   */
+  async setPricing(modelId: string, dto: CreateModelPricingDto): Promise<AIModelPricing> {
+    // 验证模型存在
+    await this.findById(modelId);
+
+    const pricing = this.pricingRepository.create({
+      pricingId: uuidv4(),
+      modelId,
+      inputPrice: dto.inputPrice,
+      outputPrice: dto.outputPrice,
+      currency: dto.currency || 'CNY',
+      effectiveDate: dto.effectiveDate ? new Date(dto.effectiveDate) : new Date(),
+    });
+
+    return this.pricingRepository.save(pricing);
+  }
+
+  /**
+   * 更新模型定价
+   */
+  async updatePricing(pricingId: string, dto: UpdateModelPricingDto): Promise<AIModelPricing> {
+    const pricing = await this.pricingRepository.findOne({
+      where: { pricingId },
+    });
+
+    if (!pricing) {
+      throw new NotFoundException(`定价配置 ${pricingId} 不存在`);
+    }
+
+    Object.assign(pricing, {
+      ...dto,
+      effectiveDate: dto.effectiveDate ? new Date(dto.effectiveDate) : pricing.effectiveDate,
+    });
+
+    return this.pricingRepository.save(pricing);
+  }
+
+  /**
+   * 获取所有模型的定价配置
+   */
+  async getAllPricing(): Promise<AIModelPricing[]> {
+    return this.pricingRepository.find({
+      relations: ['model'],
+      order: { effectiveDate: 'DESC' },
+    });
   }
 }
