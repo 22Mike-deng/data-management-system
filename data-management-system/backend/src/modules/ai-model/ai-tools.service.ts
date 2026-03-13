@@ -9,6 +9,16 @@ import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { KnowledgeBaseService } from '../knowledge-base';
 
+// 工具参数属性定义
+interface ParameterProperty {
+  type?: string;
+  description?: string;
+  enum?: string[];
+  items?: ParameterProperty;
+  properties?: Record<string, ParameterProperty>;
+  oneOf?: ParameterProperty[];
+}
+
 // 工具定义接口
 export interface ToolDefinition {
   type: 'function';
@@ -17,11 +27,7 @@ export interface ToolDefinition {
     description: string;
     parameters: {
       type: 'object';
-      properties: Record<string, {
-        type: string;
-        description: string;
-        enum?: string[];
-      }>;
+      properties: Record<string, ParameterProperty>;
       required: string[];
     };
   };
@@ -81,13 +87,35 @@ export class AIToolsService {
         type: 'function',
         function: {
           name: 'query_data',
-          description: '查询表中的数据，支持分页、排序和简单筛选',
+          description: `查询表中的数据，支持分页、排序、筛选和联合查询（JOIN）。
+
+【何时使用联合查询joins】
+1. 用户查询涉及多个表的数据（如"查询用户及其订单信息"）
+2. 用户提到的字段不在主表中，需要从关联表获取（如用户表查询订单金额）
+3. 用户需要展示关联数据（如显示部门名称而非部门ID）
+
+【使用步骤】
+1. 先调用describe_table了解主表结构
+2. 如果发现需要的字段不在主表，调用search_field搜索该字段在哪个表
+3. 使用joins参数关联该表，通过fields参数指定要获取的字段
+
+【示例】查询用户表同时获取其部门名称：
+{
+  "tableName": "user",
+  "fields": ["t0.username", "t1.name as departmentName"],
+  "joins": [{"table": "department", "alias": "t1", "on": {"localField": "dept_id", "foreignField": "id"}}]
+}`,
           parameters: {
             type: 'object',
             properties: {
               tableName: {
                 type: 'string',
-                description: '表名称（不需要带data_前缀）',
+                description: '主表名称（不需要带data_前缀）',
+              },
+              fields: {
+                type: 'array',
+                description: '要查询的字段列表。单表查询：["字段名"]；联合查询：["t0.字段名", "t1.字段名 as 别名"]。主表别名为t0',
+                items: { type: 'string' },
               },
               page: {
                 type: 'number',
@@ -109,6 +137,38 @@ export class AIToolsService {
               keyword: {
                 type: 'string',
                 description: '搜索关键词（在文本字段中搜索）',
+              },
+              filters: {
+                type: 'array',
+                description: '筛选条件数组，支持多条件组合。格式：[{field: "字段名", operator: "操作符", value: "值"}]。联合查询时field需带表别名如"t1.status"',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: { type: 'string', description: '字段名，联合查询时需带别名如t1.status' },
+                    operator: { type: 'string', description: '操作符：eq(等于), ne(不等于), gt(大于), lt(小于), gte(大于等于), lte(小于等于), like(包含), in(在列表中)', enum: ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'like', 'in'] },
+                    value: { description: '比较值，in操作时为数组' },
+                  },
+                },
+              },
+              joins: {
+                type: 'array',
+                description: '联合查询配置。当需要查询其他表的关联数据时使用。示例：[{"table": "order", "alias": "t1", "on": {"localField": "id", "foreignField": "user_id"}}] 表示通过主表id关联order表的user_id',
+                items: {
+                  type: 'object',
+                  properties: {
+                    table: { type: 'string', description: '关联表名称（不需要data_前缀）' },
+                    alias: { type: 'string', description: '关联表别名，建议使用t1, t2, t3...' },
+                    on: {
+                      type: 'object',
+                      description: '关联条件',
+                      properties: {
+                        localField: { type: 'string', description: '主表关联字段' },
+                        foreignField: { type: 'string', description: '关联表字段' },
+                      },
+                    },
+                    type: { type: 'string', description: 'JOIN类型：LEFT(左连接，默认，保留主表所有记录) 或 INNER(内连接，只返回匹配记录)', enum: ['LEFT', 'INNER'] },
+                  },
+                },
               },
             },
             required: ['tableName'],
@@ -187,7 +247,7 @@ export class AIToolsService {
         type: 'function',
         function: {
           name: 'insert_record',
-          description: '向指定表中插入一条新记录。在插入前应该先调用describe_table了解表结构，确保提供正确的字段名和必填字段。',
+          description: '向指定表中插入记录，支持单条或批量插入。在插入前应该先调用describe_table了解表结构，确保提供正确的字段名和必填字段。',
           parameters: {
             type: 'object',
             properties: {
@@ -196,8 +256,11 @@ export class AIToolsService {
                 description: '表名称（不需要带data_前缀）',
               },
               data: {
-                type: 'object',
-                description: '要插入的数据，键为字段名，值为字段值。例如: {"name": "张三", "age": 25}',
+                description: '要插入的数据。单条插入时为对象：{"name": "张三", "age": 25}；批量插入时为数组：[{"name": "张三"}, {"name": "李四"}]。批量插入最多支持100条。',
+                oneOf: [
+                  { type: 'object' },
+                  { type: 'array', items: { type: 'object' } },
+                ],
               },
             },
             required: ['tableName', 'data'],
@@ -419,15 +482,16 @@ export class AIToolsService {
   }
 
   /**
-   * 查询数据
+   * 查询数据（支持联合查询）
    */
   private async queryData(args: any): Promise<any> {
-    const { tableName, page = 1, pageSize = 10, sortBy, sortOrder = 'DESC', keyword } = args;
+    const { tableName, fields, page = 1, pageSize = 10, sortBy, sortOrder = 'DESC', keyword, filters, joins } = args;
     const fullTableName = `data_${tableName}`;
     const offset = (page - 1) * pageSize;
     const limit = Math.min(pageSize, 100);
+    const mainAlias = 't0';
 
-    // 检查表是否存在
+    // 检查主表是否存在
     const tableExists = await this.dataSource.query(`
       SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
@@ -437,12 +501,54 @@ export class AIToolsService {
       throw new Error(`表 ${tableName} 不存在`);
     }
 
-    // 构建查询
-    let whereClause = '1=1';
-    const params: any[] = [fullTableName];
+    // 收集所有表名用于验证
+    const tableAliases: Map<string, string> = new Map();
+    tableAliases.set(fullTableName, mainAlias);
 
+    // 验证并收集JOIN表
+    const joinClauses: string[] = [];
+    if (joins && Array.isArray(joins)) {
+      for (let i = 0; i < joins.length; i++) {
+        const join = joins[i];
+        const joinTable = `data_${join.table}`;
+        const alias = join.alias || `t${i + 1}`;
+        const joinType = join.type === 'INNER' ? 'INNER JOIN' : 'LEFT JOIN';
+
+        // 检查关联表是否存在
+        const joinTableExists = await this.dataSource.query(`
+          SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+        `, [joinTable]);
+
+        if (joinTableExists[0].count === 0) {
+          throw new Error(`关联表 ${join.table} 不存在`);
+        }
+
+        tableAliases.set(joinTable, alias);
+        joinClauses.push(`${joinType} ?? AS ${alias} ON ${mainAlias}.${join.on.localField} = ${alias}.${join.on.foreignField}`);
+      }
+    }
+
+    // 构建SELECT字段
+    let selectFields = '*';
+    if (fields && Array.isArray(fields) && fields.length > 0) {
+      selectFields = fields.map(f => {
+        if (f.includes('.')) {
+          return f; // 已经包含表别名
+        }
+        return `${mainAlias}.${f}`;
+      }).join(', ');
+    } else if (joins && joins.length > 0) {
+      // 联合查询时，默认选择主表所有字段
+      selectFields = `${mainAlias}.*`;
+    }
+
+    // 构建WHERE条件
+    const whereConditions: string[] = ['1=1'];
+    const params: any[] = [];
+
+    // 关键词搜索（只在主表搜索）
     if (keyword) {
-      // 获取文本字段用于搜索
       const textColumns = await this.dataSource.query(`
         SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? 
@@ -450,34 +556,86 @@ export class AIToolsService {
       `, [fullTableName]);
 
       if (textColumns.length > 0) {
-        const likeConditions = textColumns.map(() => `?? LIKE ?`).join(' OR ');
-        whereClause += ` AND (${likeConditions})`;
-        textColumns.forEach((col: any) => {
-          params.push(col.COLUMN_NAME, `%${keyword}%`);
+        const likeConditions = textColumns.map((col: any) => `${mainAlias}.${col.COLUMN_NAME} LIKE ?`).join(' OR ');
+        whereConditions.push(`(${likeConditions})`);
+        textColumns.forEach(() => {
+          params.push(`%${keyword}%`);
         });
       }
     }
 
-    // 排序
-    let orderClause = 'created_at DESC';
-    if (sortBy) {
-      orderClause = `?? ${sortOrder}`;
-      params.push(sortBy);
+    // 高级筛选条件
+    if (filters && Array.isArray(filters)) {
+      for (const filter of filters) {
+        const { field, operator, value } = filter;
+        const fieldName = field.includes('.') ? field : `${mainAlias}.${field}`;
+
+        switch (operator) {
+          case 'eq':
+            whereConditions.push(`${fieldName} = ?`);
+            params.push(value);
+            break;
+          case 'ne':
+            whereConditions.push(`${fieldName} != ?`);
+            params.push(value);
+            break;
+          case 'gt':
+            whereConditions.push(`${fieldName} > ?`);
+            params.push(value);
+            break;
+          case 'lt':
+            whereConditions.push(`${fieldName} < ?`);
+            params.push(value);
+            break;
+          case 'gte':
+            whereConditions.push(`${fieldName} >= ?`);
+            params.push(value);
+            break;
+          case 'lte':
+            whereConditions.push(`${fieldName} <= ?`);
+            params.push(value);
+            break;
+          case 'like':
+            whereConditions.push(`${fieldName} LIKE ?`);
+            params.push(`%${value}%`);
+            break;
+          case 'in':
+            if (Array.isArray(value) && value.length > 0) {
+              const placeholders = value.map(() => '?').join(', ');
+              whereConditions.push(`${fieldName} IN (${placeholders})`);
+              params.push(...value);
+            }
+            break;
+        }
+      }
     }
 
+    const whereClause = whereConditions.join(' AND ');
+
+    // 排序
+    let orderClause = `${mainAlias}.created_at DESC`;
+    if (sortBy) {
+      const orderField = sortBy.includes('.') ? sortBy : `${mainAlias}.${sortBy}`;
+      orderClause = `${orderField} ${sortOrder}`;
+    }
+
+    // 构建完整SQL（统一使用表别名，避免字段引用问题）
+    const joinClause = joinClauses.length > 0 ? joinClauses.join(' ') : '';
+    const fromClause = `FROM ?? AS ${mainAlias} ${joinClause}`.trim();
+
     // 查询总数
-    const countResult = await this.dataSource.query(
-      `SELECT COUNT(*) as total FROM ?? WHERE ${whereClause}`,
-      params
-    );
+    const countSql = joins && joins.length > 0
+      ? `SELECT COUNT(DISTINCT ${mainAlias}.id) as total ${fromClause} WHERE ${whereClause}`
+      : `SELECT COUNT(*) as total ${fromClause} WHERE ${whereClause}`;
+
+    const countResult = await this.dataSource.query(countSql, [fullTableName, ...params]);
     const total = countResult[0].total;
 
     // 查询数据
-    params.push(limit, offset);
-    const list = await this.dataSource.query(
-      `SELECT * FROM ?? WHERE ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`,
-      params
-    );
+    const dataSql = `SELECT ${selectFields} ${fromClause} WHERE ${whereClause} ORDER BY ${orderClause} LIMIT ? OFFSET ?`;
+    const dataParams = [fullTableName, ...params, limit, offset];
+
+    const list = await this.dataSource.query(dataSql, dataParams);
 
     return {
       page,
@@ -636,9 +794,9 @@ export class AIToolsService {
   }
 
   /**
-   * 插入记录
+   * 插入记录（支持批量插入）
    */
-  private async insertRecord(tableName: string, data: Record<string, any>): Promise<any> {
+  private async insertRecord(tableName: string, data: Record<string, any> | Record<string, any>[]): Promise<any> {
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在
@@ -660,20 +818,10 @@ export class AIToolsService {
     `, [fullTableName]);
 
     const columnNames = columns.map((c: any) => c.COLUMN_NAME);
-    const invalidFields = Object.keys(data).filter(key => !columnNames.includes(key));
-    
-    if (invalidFields.length > 0) {
-      throw new Error(`字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);
-    }
 
     // 检查 id 字段是否需要自动生成
     const idColumn = columns.find((c: any) => c.COLUMN_NAME === 'id');
     const isAutoIncrement = idColumn?.EXTRA?.includes('auto_increment');
-    
-    // 如果 id 字段不是自增的，且用户没有提供 id，则自动生成 UUID
-    if (idColumn && !isAutoIncrement && !data.hasOwnProperty('id')) {
-      data = { id: uuidv4(), ...data };
-    }
 
     // 检查必填字段（排除自增主键和有默认值的字段）
     const notNullColumns = columns.filter((c: any) => 
@@ -683,30 +831,75 @@ export class AIToolsService {
       c.COLUMN_NAME !== 'created_at' &&
       c.COLUMN_NAME !== 'updated_at'
     );
-    
-    const missingFields = notNullColumns
-      .filter((c: any) => !data.hasOwnProperty(c.COLUMN_NAME))
-      .map((c: any) => c.COLUMN_NAME);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`缺少必填字段: ${missingFields.join(', ')}`);
+
+    // 统一转换为数组处理
+    const dataArray = Array.isArray(data) ? data : [data];
+    const isBatch = Array.isArray(data);
+
+    // 批量插入限制
+    if (dataArray.length > 100) {
+      throw new Error(`批量插入最多支持100条记录，当前: ${dataArray.length}条`);
     }
 
-    // 构建插入SQL
-    const fields = Object.keys(data);
-    const values = Object.values(data);
-    const placeholders = fields.map(() => '?').join(', ');
-    
-    const sql = `INSERT INTO ?? (${fields.map(() => '??').join(', ')}) VALUES (${placeholders})`;
-    const params = [fullTableName, ...fields, ...values];
+    // 验证每条数据
+    const processedData: Record<string, any>[] = [];
+    for (let i = 0; i < dataArray.length; i++) {
+      let record = { ...dataArray[i] };
+
+      // 验证字段
+      const invalidFields = Object.keys(record).filter(key => !columnNames.includes(key));
+      if (invalidFields.length > 0) {
+        throw new Error(`第${i + 1}条记录字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);
+      }
+
+      // 如果 id 字段不是自增的，且用户没有提供 id，则自动生成 UUID
+      if (idColumn && !isAutoIncrement && !record.hasOwnProperty('id')) {
+        record = { id: uuidv4(), ...record };
+      }
+
+      // 检查必填字段
+      const missingFields = notNullColumns
+        .filter((c: any) => !record.hasOwnProperty(c.COLUMN_NAME))
+        .map((c: any) => c.COLUMN_NAME);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`第${i + 1}条记录缺少必填字段: ${missingFields.join(', ')}`);
+      }
+
+      processedData.push(record);
+    }
+
+    // 获取所有字段（合并所有记录的字段）
+    const allFields = new Set<string>();
+    processedData.forEach(record => {
+      Object.keys(record).forEach(key => allFields.add(key));
+    });
+    const fields = Array.from(allFields);
+
+    // 构建批量插入SQL
+    const placeholders = processedData.map(() => 
+      `(${fields.map(() => '?').join(', ')})`
+    ).join(', ');
+
+    const sql = `INSERT INTO ?? (${fields.map(() => '??').join(', ')}) VALUES ${placeholders}`;
+    const params = [fullTableName, ...fields];
+
+    // 添加所有记录的值
+    processedData.forEach(record => {
+      fields.forEach(field => {
+        params.push(record.hasOwnProperty(field) ? record[field] : null);
+      });
+    });
 
     const result = await this.dataSource.query(sql, params);
 
     return {
       success: true,
-      message: `成功向表 ${tableName} 插入 1 条记录`,
-      insertId: data.id || result.insertId,
+      message: `成功向表 ${tableName} 插入 ${processedData.length} 条记录`,
+      insertCount: processedData.length,
+      insertIds: processedData.map(r => r.id).filter(Boolean),
       affectedRows: result.affectedRows,
+      isBatch,
     };
   }
 

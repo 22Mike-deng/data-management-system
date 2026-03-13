@@ -303,10 +303,38 @@ const handleAddField = () => {
 const handleEditField = (field: FieldDefinition) => {
   fieldMode.value = 'edit'
   currentField.value = field
+
+  // 确保字段类型在选项列表中，如果不在则转换为小写或设置默认值
+  let fieldType = field.fieldType
+  const validTypes = FIELD_TYPE_OPTIONS.map(opt => opt.value)
+  if (!fieldType || !validTypes.includes(fieldType)) {
+    // 尝试转换为小写匹配
+    const lowerType = fieldType?.toLowerCase()
+    if (validTypes.includes(lowerType as FieldType)) {
+      fieldType = lowerType as FieldType
+    } else {
+      // 根据数据库类型推断
+      const dbTypeMap: Record<string, FieldType> = {
+        'TEXT': 'text',
+        'VARCHAR': 'varchar',
+        'INT': 'int',
+        'BIGINT': 'bigint',
+        'FLOAT': 'float',
+        'DOUBLE': 'double',
+        'DECIMAL': 'decimal',
+        'TINYINT': 'boolean',
+        'DATE': 'date',
+        'DATETIME': 'datetime',
+        'JSON': 'json',
+      }
+      fieldType = dbTypeMap[fieldType?.toUpperCase() || ''] || 'text'
+    }
+  }
+
   fieldForm.value = {
     fieldName: field.fieldName,
     displayName: field.displayName,
-    fieldType: field.fieldType,
+    fieldType: fieldType as FieldType,
     required: field.required,
     defaultValue: field.defaultValue || '',
     options: field.options ? JSON.stringify(field.options) : '',
