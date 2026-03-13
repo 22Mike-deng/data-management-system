@@ -746,6 +746,48 @@ const maxValue = computed(() => {
   return Math.max(...statisticsResult.value.values) * 1.1 || 100
 })
 
+// 折线图：获取X轴位置
+const getXPosition = (index: number): number => {
+  const totalWidth = Math.max(statisticsResult.value.labels.length * 60, 400)
+  const chartWidth = totalWidth - 70 // 减去左右边距
+  const dataCount = statisticsResult.value.values.length
+  if (dataCount <= 1) return 50 + chartWidth / 2
+  return 50 + (index / (dataCount - 1)) * chartWidth
+}
+
+// 折线图：获取Y轴位置
+const getYPosition = (value: number): number => {
+  const chartHeight = 150 // 图表高度
+  const paddingTop = 20
+  const y = paddingTop + chartHeight - (value / maxValue.value) * chartHeight
+  return Math.max(paddingTop, Math.min(y, paddingTop + chartHeight))
+}
+
+// 折线图：获取点坐标字符串
+const getLineChartPoints = (includeBase: boolean): string => {
+  if (statisticsResult.value.values.length === 0) return ''
+  
+  const points = statisticsResult.value.values.map((v, i) => {
+    return `${getXPosition(i)},${getYPosition(v)}`
+  })
+  
+  if (includeBase) {
+    // 填充区域需要连接到底部
+    const firstX = getXPosition(0)
+    const lastX = getXPosition(statisticsResult.value.values.length - 1)
+    return `${firstX},170 ${points.join(' ')} ${lastX},170`
+  }
+  
+  return points.join(' ')
+}
+
+// 截断标签文字
+const truncateLabel = (label: string, maxLen: number): string => {
+  if (!label) return ''
+  if (label.length <= maxLen) return label
+  return label.substring(0, maxLen) + '..'
+}
+
 const pieColors = computed(() => {
   const colors = []
   for (let i = 0; i < statisticsResult.value.labels.length; i++) {
@@ -1147,46 +1189,50 @@ watch(() => queryConfig.mainTable, (val) => {
           <!-- 柱状图 -->
           <div v-else-if="selectedChartType === 'bar'" class="h-96">
             <div class="h-full flex flex-col">
-              <div class="flex-1 flex">
-                <div class="w-16 flex flex-col justify-between text-right pr-2 text-xs text-gray-400">
+              <div class="flex-1 flex min-h-0">
+                <div class="w-16 flex flex-col justify-between text-right pr-2 text-xs text-gray-400 py-1">
                   <span>{{ maxValue > 1000 ? (maxValue / 1000).toFixed(1) + 'K' : maxValue.toFixed(0) }}</span>
                   <span>{{ (maxValue * 0.75) > 1000 ? ((maxValue * 0.75) / 1000).toFixed(1) + 'K' : (maxValue * 0.75).toFixed(0) }}</span>
                   <span>{{ (maxValue * 0.5) > 1000 ? ((maxValue * 0.5) / 1000).toFixed(1) + 'K' : (maxValue * 0.5).toFixed(0) }}</span>
                   <span>{{ (maxValue * 0.25) > 1000 ? ((maxValue * 0.25) / 1000).toFixed(1) + 'K' : (maxValue * 0.25).toFixed(0) }}</span>
                   <span>0</span>
                 </div>
-                <div class="flex-1 relative border-l border-b border-gray-200">
+                <div class="flex-1 relative border-l border-b border-gray-200 min-h-0">
+                  <!-- 背景网格线 -->
                   <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
                     <div class="border-b border-gray-100 border-dashed"></div>
                     <div class="border-b border-gray-100 border-dashed"></div>
                     <div class="border-b border-gray-100 border-dashed"></div>
                     <div class="border-b border-gray-100 border-dashed"></div>
                   </div>
+                  <!-- 柱状图区域 -->
                   <div class="absolute inset-0 flex items-end gap-1 px-2 pb-0">
                     <div
                       v-for="(label, index) in statisticsResult.labels"
                       :key="index"
-                      class="flex-1 min-w-[24px] flex flex-col items-center justify-end"
+                      class="flex-1 min-w-[20px] max-w-[60px] flex flex-col items-center justify-end h-full"
                     >
-                      <div class="relative w-full flex flex-col items-center" 
-                        :style="{ height: `${Math.max((statisticsResult.values[index] / maxValue) * 100, 2)}%`, minHeight: '4px' }">
-                        <span class="absolute -top-5 text-xs font-medium text-gray-700 whitespace-nowrap">
-                          {{ statisticsResult.values[index] > 1000 ? (statisticsResult.values[index] / 1000).toFixed(1) + 'K' : statisticsResult.values[index].toFixed(0) }}
-                        </span>
-                        <div
-                          class="w-full flex-1 rounded-t-md transition-all cursor-pointer shadow-sm hover:shadow-md bg-gradient-to-t from-primary to-primary/60"
-                        ></div>
-                      </div>
+                      <!-- 数值标签 -->
+                      <span class="text-xs font-medium text-gray-700 whitespace-nowrap mb-1">
+                        {{ statisticsResult.values[index] > 1000 ? (statisticsResult.values[index] / 1000).toFixed(1) + 'K' : statisticsResult.values[index].toFixed(0) }}
+                      </span>
+                      <!-- 柱子 - 使用固定高度而非flex -->
+                      <div
+                        class="w-full rounded-t-md transition-all cursor-pointer shadow-sm hover:shadow-md bg-gradient-to-t from-blue-500 to-blue-400"
+                        :style="{ height: `${Math.max((statisticsResult.values[index] / maxValue) * 90, 4)}%` }"
+                        :title="`${label}: ${statisticsResult.values[index].toLocaleString()}`"
+                      ></div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="flex pl-16">
+              <!-- X轴标签 -->
+              <div class="flex pl-16 h-12">
                 <div class="flex-1 flex gap-1 px-2 pt-2 overflow-x-auto">
                   <span
                     v-for="(label, index) in statisticsResult.labels"
                     :key="index"
-                    class="flex-1 min-w-[24px] text-xs text-gray-500 text-center truncate"
+                    class="flex-1 min-w-[20px] max-w-[60px] text-xs text-gray-500 text-center truncate"
                     :title="label"
                   >
                     {{ label }}
@@ -1233,35 +1279,84 @@ watch(() => queryConfig.mainTable, (val) => {
           <!-- 折线图 -->
           <div v-else-if="selectedChartType === 'line'" class="h-96">
             <div class="h-full flex flex-col">
-              <svg class="w-full flex-1" viewBox="0 0 400 200">
-                <line x1="40" y1="10" x2="40" y2="190" stroke="#e5e7eb" stroke-width="1" />
-                <line x1="40" y1="190" x2="390" y2="190" stroke="#e5e7eb" stroke-width="1" />
-                <line x1="40" y1="100" x2="390" y2="100" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4" />
+              <svg class="w-full flex-1 min-h-0" :viewBox="`0 0 ${Math.max(statisticsResult.labels.length * 60, 400)} 220`" preserveAspectRatio="xMidYMid meet">
+                <!-- 渐变定义 -->
+                <defs>
+                  <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.6" />
+                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.05" />
+                  </linearGradient>
+                </defs>
+                
+                <!-- 图表区域参数 -->
+                <!-- 左边距50(含Y轴标签), 右边距20, 上边距20, 下边距50(含X轴标签) -->
+                <!-- 绘图区域宽度 = 总宽度 - 70, 高度 = 总高度 - 70 -->
+                
+                <!-- Y轴网格线 -->
+                <line x1="50" y1="20" x2="50" y2="170" stroke="#d1d5db" stroke-width="1" />
+                <line v-for="i in 4" :key="'grid-'+i" 
+                  :x1="50" :y1="20 + (i-1) * 37.5" 
+                  :x2="Math.max(statisticsResult.labels.length * 60, 400) - 20" 
+                  :y2="20 + (i-1) * 37.5" 
+                  stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3" />
+                
+                <!-- X轴 -->
+                <line x1="50" y1="170" :x2="Math.max(statisticsResult.labels.length * 60, 400) - 20" y2="170" stroke="#d1d5db" stroke-width="1" />
+                
+                <!-- Y轴刻度标签 -->
+                <text x="45" y="24" text-anchor="end" font-size="11" fill="#9ca3af">{{ maxValue > 1000 ? (maxValue / 1000).toFixed(1) + 'K' : maxValue.toFixed(0) }}</text>
+                <text x="45" y="61.5" text-anchor="end" font-size="11" fill="#9ca3af">{{ (maxValue * 0.75) > 1000 ? ((maxValue * 0.75) / 1000).toFixed(1) + 'K' : (maxValue * 0.75).toFixed(0) }}</text>
+                <text x="45" y="99" text-anchor="end" font-size="11" fill="#9ca3af">{{ (maxValue * 0.5) > 1000 ? ((maxValue * 0.5) / 1000).toFixed(1) + 'K' : (maxValue * 0.5).toFixed(0) }}</text>
+                <text x="45" y="136.5" text-anchor="end" font-size="11" fill="#9ca3af">{{ (maxValue * 0.25) > 1000 ? ((maxValue * 0.25) / 1000).toFixed(1) + 'K' : (maxValue * 0.25).toFixed(0) }}</text>
+                <text x="45" y="174" text-anchor="end" font-size="11" fill="#9ca3af">0</text>
+                
+                <!-- 折线填充区域 -->
+                <polygon
+                  v-if="statisticsResult.values.length > 0"
+                  :points="getLineChartPoints(true)"
+                  fill="url(#lineGradient)"
+                />
+                
+                <!-- 折线 -->
                 <polyline
-                  :points="statisticsResult.values.map((v, i) => `${50 + i * (340 / (statisticsResult.values.length - 1 || 1))},${180 - (v / maxValue) * 160}`).join(' ')"
+                  v-if="statisticsResult.values.length > 0"
+                  :points="getLineChartPoints(false)"
                   fill="none"
-                  stroke="hsl(var(--primary))"
-                  stroke-width="2"
+                  stroke="#3b82f6"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
-                <circle
-                  v-for="(v, i) in statisticsResult.values"
-                  :key="i"
-                  :cx="50 + i * (340 / (statisticsResult.values.length - 1 || 1))"
-                  :cy="180 - (v / maxValue) * 160"
-                  r="4"
-                  fill="hsl(var(--primary))"
-                />
+                
+                <!-- 数据点和X轴标签 -->
+                <g v-for="(v, i) in statisticsResult.values" :key="i">
+                  <!-- 数据点 -->
+                  <circle
+                    :cx="getXPosition(i)"
+                    :cy="getYPosition(v)"
+                    r="5"
+                    fill="#3b82f6"
+                    stroke="white"
+                    stroke-width="2"
+                  />
+                  <!-- 数据值标签 -->
+                  <text
+                    :x="getXPosition(i)"
+                    :y="getYPosition(v) - 10"
+                    text-anchor="middle"
+                    font-size="10"
+                    fill="#374151"
+                  >{{ v > 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0) }}</text>
+                  <!-- X轴标签 -->
+                  <text
+                    :x="getXPosition(i)"
+                    y="190"
+                    text-anchor="middle"
+                    font-size="10"
+                    fill="#6b7280"
+                  >{{ truncateLabel(statisticsResult.labels[i], 8) }}</text>
+                </g>
               </svg>
-              <div class="flex justify-around px-10 overflow-x-auto">
-                <span
-                  v-for="(label, index) in statisticsResult.labels"
-                  :key="index"
-                  class="text-xs text-gray-500 truncate max-w-16 text-center flex-shrink-0"
-                  :title="label"
-                >
-                  {{ label }}
-                </span>
-              </div>
             </div>
           </div>
 
