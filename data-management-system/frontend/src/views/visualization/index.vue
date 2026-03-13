@@ -786,25 +786,63 @@ onMounted(() => {
         <!-- 柱状图 -->
         <div v-else-if="selectedChartType === 'bar'" class="h-96">
           <div v-if="chartData.labels.length === 0" class="h-full flex items-center justify-center text-gray-400">
-            请配置日期字段和数值字段
+            请选择数值字段
           </div>
-          <div v-else class="h-full flex items-end gap-2 px-4 overflow-x-auto">
-            <div
-              v-for="(label, index) in chartData.labels"
-              :key="index"
-              class="flex-1 min-w-[40px] flex flex-col items-center"
-            >
-              <div
-                class="w-full bg-primary rounded-t transition-all hover:bg-primary-dark cursor-pointer relative group"
-                :style="{ height: `${(chartData.values[index] / maxValue) * 100}%`, minHeight: '8px' }"
-              >
-                <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  {{ chartData.values[index].toLocaleString() }}
+          <div v-else class="h-full flex flex-col">
+            <!-- Y轴刻度 -->
+            <div class="flex-1 flex">
+              <div class="w-16 flex flex-col justify-between text-right pr-2 text-xs text-gray-400">
+                <span>{{ maxValue > 1000 ? (maxValue / 1000).toFixed(1) + 'K' : maxValue.toFixed(0) }}</span>
+                <span>{{ (maxValue * 0.75) > 1000 ? ((maxValue * 0.75) / 1000).toFixed(1) + 'K' : (maxValue * 0.75).toFixed(0) }}</span>
+                <span>{{ (maxValue * 0.5) > 1000 ? ((maxValue * 0.5) / 1000).toFixed(1) + 'K' : (maxValue * 0.5).toFixed(0) }}</span>
+                <span>{{ (maxValue * 0.25) > 1000 ? ((maxValue * 0.25) / 1000).toFixed(1) + 'K' : (maxValue * 0.25).toFixed(0) }}</span>
+                <span>0</span>
+              </div>
+              <!-- 图表区域 -->
+              <div class="flex-1 relative border-l border-b border-gray-200">
+                <!-- 横向参考线 -->
+                <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                  <div class="border-b border-gray-100 border-dashed"></div>
+                  <div class="border-b border-gray-100 border-dashed"></div>
+                  <div class="border-b border-gray-100 border-dashed"></div>
+                  <div class="border-b border-gray-100 border-dashed"></div>
+                </div>
+                <!-- 柱状图 -->
+                <div class="absolute inset-0 flex items-end gap-1 px-2 pb-0">
+                  <div
+                    v-for="(label, index) in chartData.labels"
+                    :key="index"
+                    class="flex-1 min-w-[24px] flex flex-col items-center justify-end"
+                  >
+                    <div class="relative w-full flex flex-col items-center" :style="{ height: `${(chartData.values[index] / maxValue) * 100}%`, minHeight: '4px' }">
+                      <!-- 数值标签 -->
+                      <span class="absolute -top-5 text-xs font-medium text-gray-700 whitespace-nowrap">
+                        {{ chartData.values[index] > 1000 ? (chartData.values[index] / 1000).toFixed(1) + 'K' : chartData.values[index].toFixed(0) }}
+                      </span>
+                      <!-- 柱子 -->
+                      <div
+                        class="w-full flex-1 rounded-t-md transition-all cursor-pointer shadow-sm hover:shadow-md"
+                        :style="{ 
+                          background: `linear-gradient(180deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%)`,
+                        }"
+                      ></div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <span class="text-xs text-gray-500 mt-2 truncate w-full text-center" :title="label">
-                {{ label }}
-              </span>
+            </div>
+            <!-- X轴标签 -->
+            <div class="flex pl-16">
+              <div class="flex-1 flex gap-1 px-2 pt-2 overflow-x-auto">
+                <span
+                  v-for="(label, index) in chartData.labels"
+                  :key="index"
+                  class="flex-1 min-w-[24px] text-xs text-gray-500 text-center truncate"
+                  :title="label"
+                >
+                  {{ label }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -812,7 +850,7 @@ onMounted(() => {
         <!-- 饼图 -->
         <div v-else-if="selectedChartType === 'pie'" class="h-96">
           <div v-if="chartData.labels.length === 0" class="h-full flex items-center justify-center text-gray-400">
-            请配置日期字段和数值字段
+            请选择数值字段
           </div>
           <div v-else class="h-full flex items-center justify-center gap-8">
             <div class="relative w-64 h-64">
@@ -849,7 +887,7 @@ onMounted(() => {
         <!-- 折线图 -->
         <div v-else-if="selectedChartType === 'line'" class="h-96">
           <div v-if="chartData.labels.length === 0" class="h-full flex items-center justify-center text-gray-400">
-            请配置日期字段和数值字段
+            请选择数值字段
           </div>
           <div v-else class="h-full flex flex-col">
             <svg class="w-full flex-1" viewBox="0 0 400 200">

@@ -154,14 +154,15 @@ export class AIChatService {
     const contextLength = model.parameters?.contextLength || 20;
     const history = await this.getRecentMessages(sessionId, contextLength);
 
-    // 根据是否开启知识库选择不同的系统提示词
-    // 如果使用原生 thinking（enabled/auto），则使用不带思考标签的系统提示词
-    const useNativeThinking = dto.thinkingType === 'enabled' || dto.thinkingType === 'auto';
+    // 根据是否开启思考模式选择不同的系统提示词
+    // disabled: 关闭思考，使用简单提示词
+    // enabled/auto: 开启思考，使用带思考标签的提示词（同时尝试原生 thinking）
+    const enableThinking = dto.thinkingType && dto.thinkingType !== 'disabled';
     let systemPrompt: string;
     if (dto.useKnowledgeBase) {
-      systemPrompt = useNativeThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE : SYSTEM_PROMPT_WITH_KNOWLEDGE;
+      systemPrompt = enableThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE : SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE;
     } else {
-      systemPrompt = useNativeThinking ? SYSTEM_PROMPT_SIMPLE : SYSTEM_PROMPT;
+      systemPrompt = enableThinking ? SYSTEM_PROMPT : SYSTEM_PROMPT_SIMPLE;
     }
 
     // 调用AI模型获取回复（支持工具调用）
@@ -394,7 +395,8 @@ export class AIChatService {
     };
 
     // 添加 thinking 参数（用于豆包等支持原生深度思考的模型）
-    if (thinkingType) {
+    // 只有 enabled 或 auto 时才发送 thinking 参数
+    if (thinkingType && thinkingType !== 'disabled') {
       requestBody.thinking = { type: thinkingType };
     }
 
@@ -693,12 +695,14 @@ export class AIChatService {
     const history = await this.getRecentMessages(sessionId, contextLength);
 
     // 选择系统提示词
-    const useNativeThinking = dto.thinkingType === 'enabled' || dto.thinkingType === 'auto';
+    // disabled: 关闭思考，使用简单提示词
+    // enabled/auto: 开启思考，使用带思考标签的提示词
+    const enableThinking = dto.thinkingType && dto.thinkingType !== 'disabled';
     let systemPrompt: string;
     if (dto.useKnowledgeBase) {
-      systemPrompt = useNativeThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE : SYSTEM_PROMPT_WITH_KNOWLEDGE;
+      systemPrompt = enableThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE : SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE;
     } else {
-      systemPrompt = useNativeThinking ? SYSTEM_PROMPT_SIMPLE : SYSTEM_PROMPT;
+      systemPrompt = enableThinking ? SYSTEM_PROMPT : SYSTEM_PROMPT_SIMPLE;
     }
 
     // 构建消息
@@ -847,8 +851,8 @@ export class AIChatService {
       requestBody.tool_choice = 'auto';
     }
 
-    // 添加 thinking 参数
-    if (thinkingType) {
+    // 添加 thinking 参数（只有 enabled 或 auto 时才发送）
+    if (thinkingType && thinkingType !== 'disabled') {
       requestBody.thinking = { type: thinkingType };
     }
 

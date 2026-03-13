@@ -324,7 +324,7 @@ export class AIToolsService {
 
     // 获取字段元数据
     const fieldMeta = await this.dataSource.query(`
-      SELECT fieldName, displayName, fieldType, required 
+      SELECT f.fieldName, f.displayName, f.fieldType, f.required 
       FROM sys_field f
       JOIN sys_table t ON f.tableId = t.tableId
       WHERE t.tableName = ?
