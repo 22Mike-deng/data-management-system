@@ -125,7 +125,17 @@ export interface ChatMessage {
   sessionId: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string  // 思考过程（思维链）
+  toolCalls?: ToolCall[]
   createdAt: string
+}
+
+// 工具调用记录
+export interface ToolCall {
+  name: string
+  arguments: any
+  result: any
+  success: boolean
 }
 
 // Token消耗记录

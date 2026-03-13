@@ -64,10 +64,116 @@ export function testConnectionById(modelId: string): Promise<ApiResponse<TestCon
 // 发送消息（AI对话可能涉及多轮工具调用，设置更长超时时间）
 // 支持通过 signal 取消请求
 export function sendMessage(data: SendMessageDto, signal?: AbortSignal): Promise<ApiResponse<SendMessageResult>> {
-  return request.post('/ai/chat/send', data, { 
+  return request.post('/ai/chat/send', data, {
     timeout: 120000, // 2分钟超时
     signal, // 支持取消请求
   })
+}
+
+// 流式发送消息（SSE）
+// 返回一个包含 abort 方法的对象，以及事件回调
+export interface StreamCallbacks {
+  onSession?: (sessionId: string) => void
+  onThinking?: (content: string) => void       // 思考过程增量
+  onContent?: (content: string) => void        // 回复内容增量
+  onToolCall?: (tool: { name: string; arguments: any; success: boolean }) => void
+  onDone?: (data: { sessionId: string; tokens: { input: number; output: number } }) => void
+  onError?: (message: string) => void
+}
+
+export function streamMessage(
+  data: SendMessageDto,
+  callbacks: StreamCallbacks,
+): { abort: () => void } {
+  const controller = new AbortController()
+
+  // 异步处理流式响应
+  ;(async () => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+      const response = await fetch(`${API_BASE}/ai/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        callbacks.onError?.(errorData.message || `请求失败: ${response.status}`)
+        return
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        callbacks.onError?.('无法获取响应流')
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmedLine = line.trim()
+          if (!trimmedLine) continue
+
+          // 解析 SSE 格式: "data: {...}"
+          // JSON 中包含 type 字段标识事件类型
+          try {
+            if (trimmedLine.startsWith('data: ')) {
+              const dataStr = trimmedLine.slice(6)
+              const event = JSON.parse(dataStr)
+              // 从 JSON 的 type 字段读取事件类型
+              const eventType = event.type || 'message'
+              // data 字段是 JSON 字符串，需要再解析一次
+              const eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+
+              switch (eventType) {
+                case 'session':
+                  callbacks.onSession?.(eventData.sessionId)
+                  break
+                case 'thinking':
+                  callbacks.onThinking?.(eventData.content)
+                  break
+                case 'content':
+                  callbacks.onContent?.(eventData.content)
+                  break
+                case 'tool_call':
+                  callbacks.onToolCall?.(eventData)
+                  break
+                case 'done':
+                  callbacks.onDone?.(eventData)
+                  break
+                case 'error':
+                  callbacks.onError?.(eventData.message || '未知错误')
+                  break
+              }
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        callbacks.onError?.(error.message || '请求失败')
+      }
+    }
+  })()
+
+  return {
+    abort: () => controller.abort(),
+  }
 }
 
 // 获取对话历史
@@ -131,10 +237,12 @@ export interface SendMessageDto {
   content: string
   sessionId?: string
   useKnowledgeBase?: boolean
+  thinkingType?: 'disabled' | 'enabled' | 'auto'  // 深度思考模式
 }
 
 export interface SendMessageResult {
   reply: string
+  thinking?: string  // 思考过程
   sessionId: string
   tokens: {
     input: number

@@ -2,7 +2,7 @@
  * AI对话历史实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-12
  */
 import {
   Entity,
@@ -38,6 +38,10 @@ export class AIChatHistory {
   // 对话内容
   @Column({ type: 'text' })
   content: string;
+
+  // 思考过程（思维链）
+  @Column({ type: 'text', nullable: true })
+  thinking: string;
 
   // 创建时间
   @CreateDateColumn()

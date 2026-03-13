@@ -118,6 +118,7 @@ async function initDatabase() {
           session_id VARCHAR(36) NOT NULL,
           role VARCHAR(20) NOT NULL,
           content TEXT NOT NULL,
+          thinking TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_sys_ai_chat_session_id (session_id),
           INDEX idx_sys_ai_chat_model_id (model_id),
@@ -182,6 +183,25 @@ async function initDatabase() {
     for (const table of tables) {
       await appDataSource.query(table.sql);
       console.log(`✅ 表 "${table.name}" 创建成功`);
+    }
+
+    // 步骤5.5: 数据库迁移 - 为已存在的表添加新字段
+    try {
+      // 检查 thinking 字段是否存在
+      const columns = await appDataSource.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'sys_ai_chat' AND COLUMN_NAME = 'thinking'`,
+        [dbConfig.database]
+      );
+      
+      if (columns.length === 0) {
+        await appDataSource.query(`ALTER TABLE sys_ai_chat ADD COLUMN thinking TEXT`);
+        console.log(`✅ 迁移成功: 添加 thinking 字段到 sys_ai_chat 表`);
+      } else {
+        console.log(`ℹ️ 字段 thinking 已存在，跳过迁移`);
+      }
+    } catch (error: any) {
+      console.log(`⚠️ 迁移警告: ${error.message}`);
     }
 
     console.log('✅ 数据库表结构初始化完成');

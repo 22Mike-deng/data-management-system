@@ -4,8 +4,11 @@
 * 创建时间：2026-03-11
 * 更新时间：2026-03-12
 */
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsBoolean, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+
+// 深度思考模式类型
+export type ThinkingType = 'disabled' | 'enabled' | 'auto';
 
 // 发送消息DTO
 export class SendMessageDto {
@@ -24,6 +27,10 @@ export class SendMessageDto {
   @IsBoolean()
   @IsOptional()
   useKnowledgeBase?: boolean;
+
+  @IsEnum(['disabled', 'enabled', 'auto'], { message: 'thinkingType 必须是 disabled、enabled 或 auto' })
+  @IsOptional()
+  thinkingType?: ThinkingType;
 }
 
 // 获取对话历史DTO

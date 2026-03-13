@@ -1,10 +1,11 @@
 /**
- * AI模型管理控制器
- * 创建者：dzh
- * 创建时间：2026-03-11
- * 更新时间：2026-03-12
- */
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+* AI模型管理控制器
+* 创建者：dzh
+* 创建时间：2026-03-11
+* 更新时间：2026-03-13
+*/
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto } from './dto';
@@ -175,6 +176,49 @@ export class AIModelController {
       message: 'success',
       data: result,
     };
+  }
+
+  /**
+   * 流式发送消息（SSE）
+   * POST /api/ai/chat/stream
+   * 返回 Server-Sent Events 流
+   * 注意：@Sse 装饰器只支持 GET 请求，需要手动处理 POST 的 SSE 响应
+   */
+  @Post('chat/stream')
+  async streamChat(
+    @Body() dto: SendMessageDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // 禁用 nginx 缓冲
+
+    // 获取流式 Observable
+    const observable = await this.chatService.streamMessage(dto);
+
+    // 订阅 Observable 并写入响应
+    const subscription = observable.subscribe({
+      next: (event) => {
+        // SSE 格式: data: {json}\n\n
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      },
+      error: (error) => {
+        // 发送错误事件
+        res.write(`data: ${JSON.stringify({ type: 'error', data: { message: error.message } })}\n\n`);
+        res.end();
+      },
+      complete: () => {
+        res.end();
+      },
+    });
+
+    // 处理客户端断开连接
+    req.on('close', () => {
+      subscription.unsubscribe();
+    });
   }
 
   /**
