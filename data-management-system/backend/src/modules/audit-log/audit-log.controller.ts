@@ -37,7 +37,7 @@ export class AuditLogController {
     @Query('endDate') endDate?: string,
     @Query('success') success?: string,
   ) {
-    return this.auditLogService.queryLogs({
+    const data = await this.auditLogService.queryLogs({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
       action,
@@ -49,6 +49,11 @@ export class AuditLogController {
       endDate: endDate ? new Date(endDate) : undefined,
       success: success === 'true' ? true : success === 'false' ? false : undefined,
     });
+    return {
+      code: 0,
+      message: 'success',
+      data,
+    };
   }
 
   /**
@@ -56,7 +61,12 @@ export class AuditLogController {
    */
   @Get(':id')
   async getLogById(@Param('id') id: string) {
-    return this.auditLogService.getLogById(id);
+    const data = await this.auditLogService.getLogById(id);
+    return {
+      code: 0,
+      message: 'success',
+      data,
+    };
   }
 
   /**
@@ -67,9 +77,14 @@ export class AuditLogController {
     @Request() req: any,
     @Query('limit') limit?: string,
   ) {
-    return this.auditLogService.getUserActionHistory(req.user?.userId, {
+    const data = await this.auditLogService.getUserActionHistory(req.user?.userId, {
       limit: limit ? parseInt(limit, 10) : 50,
     });
+    return {
+      code: 0,
+      message: 'success',
+      data,
+    };
   }
 
   /**
@@ -80,9 +95,14 @@ export class AuditLogController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.auditLogService.getActionStats(
+    const data = await this.auditLogService.getActionStats(
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
     );
+    return {
+      code: 0,
+      message: 'success',
+      data,
+    };
   }
 }

@@ -117,7 +117,7 @@ export class AuditLog {
   /**
    * 错误信息
    */
-  @Column({ length: 1000, nullable: true, comment: '错误信息' })
+  @Column({ type: 'text', nullable: true, comment: '错误信息' })
   errorMessage: string;
 
   /**

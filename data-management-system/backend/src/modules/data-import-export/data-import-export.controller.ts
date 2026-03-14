@@ -55,7 +55,7 @@ export class DataImportExportController {
       importFormat = ext || 'csv';
     }
 
-    return this.importExportService.importData(
+    const result = await this.importExportService.importData(
       tableId,
       file,
       importFormat,
@@ -63,10 +63,16 @@ export class DataImportExportController {
       req.user?.username,
       req.ip,
     );
+
+    return {
+      code: 0,
+      message: '导入完成',
+      data: result,
+    };
   }
 
   /**
-   * 导出数据
+   * 导出数据（使用中文显示名，方便用户查看）
    */
   @Get('export/:tableId')
   async exportData(
@@ -80,7 +86,8 @@ export class DataImportExportController {
       format || 'xlsx',
       req.user?.userId,
       req.user?.username,
-      req.ip,
+      req.user?.ip,
+      true, // 使用显示名作为表头
     );
 
     res.setHeader('Content-Type', result.mimeType);
@@ -92,7 +99,7 @@ export class DataImportExportController {
   }
 
   /**
-   * 下载导入模板
+   * 下载导入模板（使用英文字段名，方便导入匹配）
    */
   @Get('template/:tableId')
   async downloadTemplate(
@@ -100,16 +107,21 @@ export class DataImportExportController {
     @Query('format') format: ExportFormat,
     @Res() res: Response,
   ) {
-    // 导出空数据作为模板
+    // 导出空数据作为模板，使用字段名作为表头
     const result = await this.importExportService.exportData(
       tableId,
       format || 'xlsx',
+      undefined,
+      undefined,
+      undefined,
+      false, // 使用字段名作为表头，便于导入匹配
     );
 
+    const templateFilename = `template_${result.filename}`;
     res.setHeader('Content-Type', result.mimeType);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="template_${result.filename}"`,
+      `attachment; filename="${encodeURIComponent(templateFilename)}"`,
     );
     res.send(result.data);
   }

@@ -88,6 +88,8 @@ export class DataImportExportService {
     // 获取表字段
     const fields = tableInfo.fields || [];
     const fieldNames = fields.map(f => f.fieldName);
+    // 系统自动生成的字段，不需要在表定义中
+    const systemFields = ['id', 'created_at', 'updated_at'];
 
     // 验证并处理每条记录
     const result: ImportResult = {
@@ -117,8 +119,10 @@ export class DataImportExportService {
           continue;
         }
 
-        // 检查字段是否存在
-        const invalidFields = recordFields.filter(key => !fieldNames.includes(key));
+        // 检查字段是否存在（排除系统字段）
+        const invalidFields = recordFields.filter(
+          key => !fieldNames.includes(key) && !systemFields.includes(key)
+        );
         if (invalidFields.length > 0) {
           result.errors.push({
             row: rowNumber,
@@ -171,36 +175,44 @@ export class DataImportExportService {
       }
     }
 
-    // 批量插入有效记录
+    // 逐条插入有效记录（便于处理重复键错误）
     if (validRecords.length > 0) {
-      try {
-        const allFields = new Set<string>();
-        validRecords.forEach(record => {
-          Object.keys(record).forEach(key => allFields.add(key));
-        });
-        const insertFields = Array.from(allFields);
+      const allFields = new Set<string>();
+      validRecords.forEach(record => {
+        Object.keys(record).forEach(key => allFields.add(key));
+      });
+      const insertFields = Array.from(allFields);
 
-        const placeholders = validRecords.map(
-          () => `(${insertFields.map(() => '?').join(', ')})`
-        ).join(', ');
+      for (let i = 0; i < validRecords.length; i++) {
+        const record = validRecords[i];
+        const rowNumber = i + 2; // 对应原始行号
 
-        const sql = `INSERT INTO ?? (${insertFields.map(() => '??').join(', ')}) VALUES ${placeholders}`;
-        const params = [fullTableName, ...insertFields];
-
-        validRecords.forEach(record => {
+        try {
+          const placeholders = insertFields.map(() => '?').join(', ');
+          const sql = `INSERT INTO ?? (${insertFields.map(() => '??').join(', ')}) VALUES (${placeholders})`;
+          const params = [fullTableName, ...insertFields];
           insertFields.forEach(field => {
             params.push(record.hasOwnProperty(field) ? record[field] : null);
           });
-        });
 
-        await this.dataSource.query(sql, params);
-        result.inserted = validRecords.length;
-      } catch (error: any) {
-        result.success = false;
-        result.errors.push({
-          row: 0,
-          message: `批量插入失败: ${error.message}`,
-        });
+          await this.dataSource.query(sql, params);
+          result.inserted++;
+        } catch (error: any) {
+          // 处理重复键错误
+          if (error.code === 'ER_DUP_ENTRY' || error.message?.includes('Duplicate entry')) {
+            result.errors.push({
+              row: rowNumber,
+              message: `记录已存在（重复键）: ${error.message}`,
+            });
+            result.skipped++;
+          } else {
+            result.errors.push({
+              row: rowNumber,
+              message: `插入失败: ${error.message}`,
+            });
+            result.skipped++;
+          }
+        }
       }
     }
 
@@ -228,6 +240,12 @@ export class DataImportExportService {
 
   /**
    * 导出数据
+   * @param tableId 表ID
+   * @param format 导出格式
+   * @param userId 用户ID
+   * @param username 用户名
+   * @param ipAddress IP地址
+   * @param useDisplayName 是否使用显示名作为表头（默认false，使用字段名以便导入）
    */
   async exportData(
     tableId: string,
@@ -235,6 +253,7 @@ export class DataImportExportService {
     userId?: string,
     username?: string,
     ipAddress?: string,
+    useDisplayName = false,
   ): Promise<{ data: Buffer; filename: string; mimeType: string }> {
     // 获取表结构
     const tableInfo = await this.tableMetaService.findTableById(tableId);
@@ -272,7 +291,7 @@ export class DataImportExportService {
 
     switch (format) {
       case 'csv':
-        buffer = this.generateCsv(data, fields);
+        buffer = this.generateCsv(data, fields, useDisplayName);
         mimeType = 'text/csv';
         break;
       case 'json':
@@ -280,7 +299,7 @@ export class DataImportExportService {
         mimeType = 'application/json';
         break;
       case 'xlsx':
-        buffer = this.generateExcel(data, fields);
+        buffer = this.generateExcel(data, fields, useDisplayName);
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         break;
       default:
@@ -357,15 +376,18 @@ export class DataImportExportService {
 
   /**
    * 生成CSV数据
+   * @param data 数据数组
+   * @param fields 字段定义
+   * @param useDisplayName 是否使用显示名作为表头（默认使用字段名以便导入）
    */
-  private generateCsv(data: any[], fields: any[]): Buffer {
+  private generateCsv(data: any[], fields: any[], useDisplayName = false): Buffer {
     if (data.length === 0) {
       return Buffer.from('');
     }
 
-    // 表头
-    const headers = fields.map(f => f.displayName || f.fieldName);
-    
+    // 表头：使用字段名以便导入时匹配
+    const headers = fields.map(f => useDisplayName ? (f.displayName || f.fieldName) : f.fieldName);
+
     // 数据行
     const rows = data.map(row =>
       fields.map(f => {
@@ -394,21 +416,24 @@ export class DataImportExportService {
 
   /**
    * 生成Excel数据
+   * @param data 数据数组
+   * @param fields 字段定义
+   * @param useDisplayName 是否使用显示名作为表头（默认使用字段名以便导入）
    */
-  private generateExcel(data: any[], fields: any[]): Buffer {
+  private generateExcel(data: any[], fields: any[], useDisplayName = false): Buffer {
     const workbook = xlsx.utils.book_new();
-    
-    // 准备数据
-    const headers = fields.map(f => f.displayName || f.fieldName);
+
+    // 表头：使用字段名以便导入时匹配
+    const headers = fields.map(f => useDisplayName ? (f.displayName || f.fieldName) : f.fieldName);
     const rows = data.map(row =>
       fields.map(f => row[f.fieldName] ?? '')
     );
-    
+
     const sheetData = [headers, ...rows];
     const worksheet = xlsx.utils.aoa_to_sheet(sheetData);
-    
+
     xlsx.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-    
+
     return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   }
 

@@ -386,10 +386,14 @@ const handleExport = () => {
 }
 
 // 执行导出
-const handleDoExport = (format: 'csv' | 'json' | 'xlsx') => {
-  exportData(tableId.value, format)
-  showExportModal.value = false
-  MessagePlugin.success('正在导出，请稍候...')
+const handleDoExport = async (format: 'csv' | 'json' | 'xlsx') => {
+  try {
+    await exportData(tableId.value, format)
+    showExportModal.value = false
+    MessagePlugin.success('导出成功')
+  } catch (error: any) {
+    MessagePlugin.error(error.message || '导出失败')
+  }
 }
 
 // 返回
