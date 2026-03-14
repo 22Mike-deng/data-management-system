@@ -195,7 +195,7 @@ onMounted(() => {
           <!-- 主题切换 -->
           <ThemeSwitch />
           <span class="text-sm header-version">
-            数据管理可视化系统 v1.0.0
+            数据管理可视化系统 v1.0.1
           </span>
         </div>
       </header>
