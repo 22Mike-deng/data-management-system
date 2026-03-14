@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- 数据管理系统应用图标 - 占位图 -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1890ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0050b3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="64" fill="url(#bg)"/>
+  
+  <!-- 数据库图标 -->
+  <g fill="white">
+    <!-- 圆柱体 -->
+    <ellipse cx="256" cy="160" rx="100" ry="40" fill="white" opacity="0.9"/>
+    <rect x="156" y="160" width="200" height="192" fill="white" opacity="0.9"/>
+    <ellipse cx="256" cy="352" rx="100" ry="40" fill="white" opacity="0.9"/>
+    
+    <!-- 内部线条 -->
+    <ellipse cx="256" cy="224" rx="100" ry="40" fill="none" stroke="#1890ff" stroke-width="2"/>
+    <ellipse cx="256" cy="288" rx="100" ry="40" fill="none" stroke="#1890ff" stroke-width="2"/>
+  </g>
+  
+  <!-- 管理齿轮图标 -->
+  <g transform="translate(380, 380)">
+    <circle cx="0" cy="0" r="50" fill="white" opacity="0.9"/>
+    <circle cx="0" cy="0" r="20" fill="#1890ff"/>
+    <!-- 齿轮齿 -->
+    <g fill="white">
+      <rect x="-8" y="-60" width="16" height="20" rx="4"/>
+      <rect x="-8" y="40" width="16" height="20" rx="4"/>
+      <rect x="-60" y="-8" width="20" height="16" rx="4"/>
+      <rect x="40" y="-8" width="20" height="16" rx="4"/>
+    </g>
+  </g>
+</svg>

@@ -2,14 +2,19 @@
  * Axios 请求封装
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '@/types'
+import { usePlatform } from '@/platforms'
+
+// 获取平台适配器，动态获取 API 基础地址
+// Web 端使用 '/api'（由代理转发），Electron 端使用远程服务器地址
+const platform = usePlatform()
 
 // 创建axios实例
 const service: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: platform.apiBaseUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

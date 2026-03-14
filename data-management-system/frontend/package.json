@@ -7,8 +7,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:electron": "cross-env BUILD_TARGET=electron vue-tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron ../desktop/main.js\"",
+    "electron:build": "npm run build:electron && cd ../desktop && npm run build"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
@@ -28,6 +31,9 @@
     "@types/node": "^20.10.4",
     "@vitejs/plugin-vue": "^5.1.4",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.0.0",
     "less": "^4.6.4",
     "lucide-vue-next": "^0.303.0",
     "postcss": "^8.5.0",
@@ -36,6 +42,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~5.6.2",
     "vite": "^5.4.10",
-    "vue-tsc": "^2.1.8"
+    "vue-tsc": "^2.1.8",
+    "wait-on": "^7.2.0"
   }
 }

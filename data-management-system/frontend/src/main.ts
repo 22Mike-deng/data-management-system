@@ -14,6 +14,12 @@ import router from './router'
 import './styles/variables.css'
 import './style.css'
 
+// 初始化平台适配器（支持 Web 和 Electron）
+import { initPlatform } from './platforms'
+
+// 在应用启动时初始化平台适配器
+initPlatform()
+
 const app = createApp(App)
 
 // 状态管理

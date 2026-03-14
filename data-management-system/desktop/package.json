@@ -1,0 +1,24 @@
+{
+  "name": "data-management-desktop",
+  "version": "1.0.1",
+  "description": "数据管理系统 - Electron 桌面客户端",
+  "main": "main.js",
+  "author": "dzh",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "cross-env NODE_ENV=development electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "electron": "^28.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.9.1"
+  }
+}
