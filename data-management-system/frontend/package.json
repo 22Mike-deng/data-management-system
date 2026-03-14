@@ -26,6 +26,7 @@
     "@types/node": "^20.10.4",
     "@vitejs/plugin-vue": "^5.1.4",
     "autoprefixer": "^10.4.20",
+    "less": "^4.6.4",
     "lucide-vue-next": "^0.303.0",
     "postcss": "^8.5.0",
     "tailwind-merge": "^2.5.5",
