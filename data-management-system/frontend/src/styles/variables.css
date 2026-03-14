@@ -14,6 +14,7 @@
   
   /* 背景色 */
   --color-bg-page: #f5f7fa;
+  --color-bg-layout: #f5f7fa;
   --color-bg-container: #ffffff;
   --color-bg-card: #ffffff;
   --color-bg-hover: #f0f2f5;
@@ -73,6 +74,7 @@
   
   /* 背景色 */
   --color-bg-page: #111827;
+  --color-bg-layout: #1f2937;
   --color-bg-container: #1f2937;
   --color-bg-card: #374151;
   --color-bg-hover: #4b5563;
@@ -167,4 +169,56 @@
 
 .border-default {
   border-color: var(--color-border);
+}
+
+/* 原生表单元素样式 */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--color-bg-layout);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+select option {
+  background-color: var(--color-bg-container);
+  color: var(--color-text-primary);
+}
+
+input[type="date"] {
+  background-color: var(--color-bg-layout);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--color-text-primary);
+}
+
+input[type="date"]::-webkit-datetime-edit-text {
+  color: var(--color-text-secondary);
+}
+
+/* 暗色模式下的表单元素 */
+[data-theme='dark'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
+[data-theme='dark'] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
 }
