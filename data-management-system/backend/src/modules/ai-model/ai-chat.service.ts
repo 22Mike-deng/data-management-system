@@ -366,11 +366,14 @@ export class AIChatService {
       const choice = data.choices?.[0];
       const assistantMessage = choice?.message;
 
-      // 提取原生 thinking 内容（豆包等模型返回格式）
-      // reasoning_content 是豆包模型返回思考内容的字段
+      // 提取原生 thinking 内容（DeepSeek、豆包等模型返回格式）
+      // reasoning_content 是模型返回的思维链/思考过程
       if (assistantMessage?.reasoning_content && !nativeThinking) {
         nativeThinking = assistantMessage.reasoning_content;
       }
+
+      // 【特殊处理】当 content 为空但 reasoning_content 有内容时
+      // 某些模型（如 DeepSeek）可能在思考模式下只返回 reasoning_content
 
       // 检查是否有工具调用
       if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
@@ -396,8 +399,23 @@ export class AIChatService {
         }
       } else {
         // 没有工具调用，返回最终回复
+        // 【特殊处理】如果 content 为空但有 reasoning_content，则将 reasoning_content 作为正式回复
+        const actualContent = assistantMessage?.content || '';
+        const hasReasoningContent = nativeThinking && nativeThinking.trim();
+
+        if (!actualContent.trim() && hasReasoningContent) {
+          // content 为空但有 reasoning_content，将 reasoning_content 作为正式回复
+          return {
+            reply: nativeThinking,
+            thinking: undefined,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
+          };
+        }
+
         return {
-          reply: assistantMessage?.content || '抱歉，没有获取到回复',
+          reply: actualContent || '抱歉，没有获取到回复',
           thinking: nativeThinking,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
@@ -729,7 +747,12 @@ export class AIChatService {
       }
     }
 
-
+    // 【特殊处理】如果 content 为空但 thinking 有内容，将 thinking 作为正式回复
+    // 某些模型（如 DeepSeek）可能在思考模式下只返回 reasoning_content
+    if (!fullContent.trim() && fullThinking.trim()) {
+      fullContent = fullThinking;
+      fullThinking = '';
+    }
 
     // 保存AI回复（添加创建者ID）
     const assistantMessage = this.chatRepository.create({
@@ -883,7 +906,8 @@ export class AIChatService {
             const delta = data.choices?.[0]?.delta;
             if (!delta) continue;
 
-            // 处理思考内容（豆包原生）
+            // 处理思考内容（DeepSeek、豆包等原生思考模型）
+            // reasoning_content 是模型的思维链/思考过程
             if (delta.reasoning_content) {
               fullThinking += delta.reasoning_content;
               subject.next({
