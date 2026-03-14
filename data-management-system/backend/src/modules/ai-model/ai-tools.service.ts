@@ -2,12 +2,13 @@
  * AI工具服务 - 数据库管理工具
  * 创建者：dzh
  * 创建时间：2026-03-12
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { KnowledgeBaseService } from '../knowledge-base';
+import { isValidTableName, validateFieldNames } from '../../common/utils/sql-sanitizer.util';
 
 // 工具参数属性定义
 interface ParameterProperty {
@@ -797,6 +798,11 @@ export class AIToolsService {
    * 插入记录（支持批量插入）
    */
   private async insertRecord(tableName: string, data: Record<string, any> | Record<string, any>[]): Promise<any> {
+    // 【安全修复】验证表名格式，防止 SQL 注入
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}`);
+    }
+
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在
@@ -846,8 +852,15 @@ export class AIToolsService {
     for (let i = 0; i < dataArray.length; i++) {
       let record = { ...dataArray[i] };
 
-      // 验证字段
-      const invalidFields = Object.keys(record).filter(key => !columnNames.includes(key));
+      // 【安全修复】验证字段名格式
+      const recordFields = Object.keys(record);
+      const fieldValidation = validateFieldNames(recordFields);
+      if (!fieldValidation.valid) {
+        throw new Error(`第${i + 1}条记录包含非法字段名: ${fieldValidation.invalidFields.join(', ')}`);
+      }
+
+      // 验证字段是否存在
+      const invalidFields = recordFields.filter(key => !columnNames.includes(key));
       if (invalidFields.length > 0) {
         throw new Error(`第${i + 1}条记录字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);
       }
@@ -907,6 +920,11 @@ export class AIToolsService {
    * 更新记录
    */
   private async updateRecord(tableName: string, data: Record<string, any>, recordId: string): Promise<any> {
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}`);
+    }
+
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在
@@ -937,7 +955,15 @@ export class AIToolsService {
     `, [fullTableName]);
 
     const columnNames = columns.map((c: any) => c.COLUMN_NAME);
-    const invalidFields = Object.keys(data).filter(key => !columnNames.includes(key));
+    
+    // 【安全修复】验证字段名格式
+    const dataFields = Object.keys(data);
+    const fieldValidation = validateFieldNames(dataFields);
+    if (!fieldValidation.valid) {
+      throw new Error(`包含非法字段名: ${fieldValidation.invalidFields.join(', ')}`);
+    }
+
+    const invalidFields = dataFields.filter(key => !columnNames.includes(key));
     
     if (invalidFields.length > 0) {
       throw new Error(`字段不存在: ${invalidFields.join(', ')}。可用字段: ${columnNames.join(', ')}`);

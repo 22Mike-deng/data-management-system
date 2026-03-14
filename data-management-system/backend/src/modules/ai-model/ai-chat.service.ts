@@ -1,9 +1,9 @@
 /**
- * AI对话服务
- * 创建者：dzh
- * 创建时间：2026-03-11
- * 更新时间：2026-03-13
- */
+* AI对话服务
+* 创建者：dzh
+* 创建时间：2026-03-11
+* 更新时间：2026-03-14
+*/
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -360,37 +360,36 @@ export class AIChatService {
 
   /**
    * 获取会话列表
+   * 【性能优化】使用子查询一次性获取模型名称，避免 N+1 查询
    */
   async getSessionList() {
+    // 使用子查询获取每个会话的模型信息，避免循环查询
     const sessions = await this.chatRepository
       .createQueryBuilder('chat')
       .select('chat.sessionId', 'sessionId')
       .addSelect('MIN(chat.createdAt)', 'createdAt')
       .addSelect('MIN(CASE WHEN chat.role = :userRole THEN chat.content END)', 'firstMessage')
       .addSelect('MAX(chat.createdAt)', 'updatedAt')
+      // 【优化】使用子查询获取模型名称
+      .addSelect(
+        (subQuery) =>
+          subQuery
+            .select('m.modelName')
+            .from(AIModelConfig, 'm')
+            .innerJoin('ai_chat_history', 'ch', 'ch.modelId = m.id')
+            .where('ch.sessionId = chat.sessionId')
+            .limit(1),
+        'modelName',
+      )
       .setParameters({ userRole: 'user' })
       .groupBy('chat.sessionId')
       .orderBy('MAX(chat.createdAt)', 'DESC')
       .getRawMany();
 
-    // 为每个会话获取模型名称
-    for (const session of sessions) {
-      // 获取该会话的一条记录来获取模型信息
-      const chatRecord = await this.chatRepository.findOne({
-        where: { sessionId: session.sessionId },
-        select: ['modelId'],
-      });
-      if (chatRecord?.modelId) {
-        try {
-          const model = await this.modelService.findById(chatRecord.modelId);
-          session.modelName = model.modelName;
-        } catch {
-          session.modelName = '未知模型';
-        }
-      }
-      // 使用 firstMessage 作为显示内容
+    // 使用 firstMessage 作为显示内容
+    sessions.forEach((session) => {
       session.lastMessage = session.firstMessage;
-    }
+    });
 
     return sessions;
   }

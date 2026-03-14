@@ -2,17 +2,20 @@
 * 动态数据服务
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-12
+* 更新时间：2026-03-14
 */
-import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { TableMetaService } from '../table-meta';
 import { FieldDefinition } from '@/database/entities';
 import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto, AggregateQueryDto } from './dto';
+import { isValidTableName, isValidFieldName, validateFieldNames, escapeLikeValue } from '../../common/utils/sql-sanitizer.util';
 
 @Injectable()
 export class DynamicDataService implements OnModuleInit {
+  private readonly logger = new Logger(DynamicDataService.name);
+
   constructor(
     private dataSource: DataSource,
     private tableMetaService: TableMetaService,
@@ -31,6 +34,17 @@ export class DynamicDataService implements OnModuleInit {
   async createDynamicTable(tableId: string): Promise<void> {
     const table = await this.tableMetaService.findTableById(tableId);
     const tableName = `data_${table.tableName}`;
+
+    // 【安全修复】验证表名格式，防止 SQL 注入
+    if (!isValidTableName(table.tableName)) {
+      throw new BadRequestException(`无效的表名: ${table.tableName}`);
+    }
+
+    // 【安全修复】验证所有字段名格式
+    const fieldValidation = validateFieldNames(table.fields.map(f => f.fieldName));
+    if (!fieldValidation.valid) {
+      throw new BadRequestException(`无效的字段名: ${fieldValidation.invalidFields.join(', ')}`);
+    }
 
     // 检查表是否存在
     const tableExists = await this.checkTableExists(tableName);
@@ -393,9 +407,16 @@ export class DynamicDataService implements OnModuleInit {
 
   /**
    * 构建筛选条件SQL
+   * 【安全修复】验证字段名并转义 LIKE 查询值
    */
   private buildFilterCondition(filter: { field: string; operator: string; value: any }): { clause: string; params: unknown[] } | null {
     const { field, operator, value } = filter;
+
+    // 【安全修复】验证字段名格式，防止 SQL 注入
+    if (!isValidFieldName(field)) {
+      this.logger.warn(`检测到非法字段名: ${field}`);
+      return null;
+    }
 
     switch (operator) {
       case 'eq':
@@ -411,7 +432,9 @@ export class DynamicDataService implements OnModuleInit {
       case 'lte':
         return { clause: `?? <= ?`, params: [field, value] };
       case 'like':
-        return { clause: `?? LIKE ?`, params: [field, `%${value}%`] };
+        // 【安全修复】转义 LIKE 查询中的特殊字符
+        const escapedValue = escapeLikeValue(String(value));
+        return { clause: `?? LIKE ?`, params: [field, `%${escapedValue}%`] };
       case 'in':
         if (Array.isArray(value) && value.length > 0) {
           const placeholders = value.map(() => '?').join(', ');

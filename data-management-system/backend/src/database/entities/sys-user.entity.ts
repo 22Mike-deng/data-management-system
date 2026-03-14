@@ -2,7 +2,7 @@
  * 系统用户实体
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import {
   Entity,
@@ -10,6 +10,7 @@ import {
   PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 
 @Entity('sys_user')
@@ -57,6 +58,10 @@ export class SysUser {
   // 更新人ID
   @Column({ type: 'varchar', length: 36, nullable: true })
   updatedBy: string;
+
+  // 【并发控制】乐观锁版本号，每次更新自动递增
+  @VersionColumn()
+  version: number;
 
   // 创建时间
   @CreateDateColumn()

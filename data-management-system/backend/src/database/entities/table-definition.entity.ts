@@ -2,7 +2,7 @@
  * 表定义实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-14
  */
 import {
   Entity,
@@ -11,6 +11,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  VersionColumn,
 } from 'typeorm';
 import { FieldDefinition } from './field-definition.entity';
 
@@ -31,6 +32,10 @@ export class TableDefinition {
   // 表描述
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  // 【并发控制】乐观锁版本号，每次更新自动递增
+  @VersionColumn()
+  version: number;
 
   // 创建时间
   @CreateDateColumn()

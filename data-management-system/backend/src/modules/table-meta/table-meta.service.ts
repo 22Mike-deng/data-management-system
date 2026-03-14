@@ -2,7 +2,7 @@
 * 数据表元数据服务
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-13
+* 更新时间：2026-03-14
 */
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,6 +19,9 @@ export interface IDynamicDataService {
 
 // 缓存键前缀
 const CACHE_PREFIX = 'table_meta';
+
+// 【防缓存穿透】空结果标记
+const NULL_CACHE_MARKER = '__NULL__';
 
 @Injectable()
 export class TableMetaService {
@@ -58,13 +61,20 @@ export class TableMetaService {
 
   /**
    * 获取数据表详情（包含字段，带缓存）
+   * 【性能优化】缓存空结果防止缓存穿透
    */
   async findTableById(tableId: string): Promise<TableDefinition> {
     const cacheKey = RedisCacheService.buildKey(CACHE_PREFIX, 'table', tableId);
     
-    const cached = await this.cacheService.get<TableDefinition>(cacheKey);
-    if (cached) {
-      return cached;
+    const cached = await this.cacheService.get<TableDefinition | string>(cacheKey);
+    
+    // 【防缓存穿透】检查是否为空结果标记
+    if (cached === NULL_CACHE_MARKER) {
+      throw new NotFoundException(`数据表 ${tableId} 不存在`);
+    }
+    
+    if (cached && cached !== NULL_CACHE_MARKER) {
+      return cached as TableDefinition;
     }
 
     const table = await this.tableRepository.findOne({
@@ -74,6 +84,8 @@ export class TableMetaService {
     });
     
     if (!table) {
+      // 【防缓存穿透】缓存空结果，使用较短时间（60秒）
+      await this.cacheService.set(cacheKey, NULL_CACHE_MARKER, 60);
       throw new NotFoundException(`数据表 ${tableId} 不存在`);
     }
     
