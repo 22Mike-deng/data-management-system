@@ -28,6 +28,16 @@ import { RedisCacheService } from './redis-cache.service';
           password: redisPassword || undefined,
           db: redisDb,
           ttl: ttl * 1000, // 转换为毫秒
+          // 连接超时和重试配置
+          connectTimeout: 5000, // 5秒连接超时
+          maxRetriesPerRequest: 3, // 每个请求最大重试次数
+          retryStrategy: (times: number) => {
+            if (times > 3) {
+              console.warn('⚠️ Redis 连接失败，缓存功能可能无法使用');
+              return null; // 超过3次放弃重试
+            }
+            return Math.min(times * 100, 2000); // 重试间隔，最大2秒
+          },
         });
 
         return {

@@ -41,17 +41,21 @@ async function bootstrap() {
   // 设置全局前缀
   app.setGlobalPrefix('api');
 
-  // 验证邮件服务
-  const mailService = app.get(MailService);
-  const mailConnected = await mailService.verify();
-  if (!mailConnected) {
-    console.warn('⚠️ 邮件服务连接失败，验证码功能可能无法使用');
-    console.warn('请检查 .env 中的 SMTP 配置是否正确');
-  }
-
+  // 先启动服务（不阻塞）
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`🚀 后端服务已启动: http://localhost:${port}`);
   console.log(`📝 CORS已启用，允许的域名: ${corsOrigins.join(', ')}`);
+
+  // 验证邮件服务（非阻塞，在后台进行）
+  const mailService = app.get(MailService);
+  mailService.verify().then(mailConnected => {
+    if (!mailConnected) {
+      console.warn('⚠️ 邮件服务连接失败，验证码功能可能无法使用');
+      console.warn('请检查 .env 中的 SMTP 配置是否正确');
+    } else {
+      console.log('✅ 邮件服务连接成功');
+    }
+  });
 }
 bootstrap();
