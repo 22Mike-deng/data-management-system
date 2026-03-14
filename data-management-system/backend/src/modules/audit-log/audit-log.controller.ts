@@ -77,7 +77,7 @@ export class AuditLogController {
     @Request() req: any,
     @Query('limit') limit?: string,
   ) {
-    const data = await this.auditLogService.getUserActionHistory(req.user?.userId, {
+    const data = await this.auditLogService.getUserActionHistory(req.user?.id, {
       limit: limit ? parseInt(limit, 10) : 50,
     });
     return {

@@ -59,7 +59,7 @@ export class DataImportExportController {
       tableId,
       file,
       importFormat,
-      req.user?.userId,
+      req.user?.id,
       req.user?.username,
       req.ip,
     );
@@ -84,9 +84,9 @@ export class DataImportExportController {
     const result = await this.importExportService.exportData(
       tableId,
       format || 'xlsx',
-      req.user?.userId,
+      req.user?.id,
       req.user?.username,
-      req.user?.ip,
+      req.ip,
       true, // 使用显示名作为表头
     );
 
