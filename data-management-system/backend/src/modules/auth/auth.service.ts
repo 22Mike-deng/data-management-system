@@ -2,14 +2,15 @@
  * 认证服务
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { SysUser } from '../../database/entities/sys-user.entity';
+import { validatePassword } from '../../common/utils/password.util';
 
 @Injectable()
 export class AuthService {
@@ -126,6 +127,18 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('旧密码错误');
+    }
+
+    // 【安全修复】验证新密码复杂度
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      throw new BadRequestException(`密码不符合要求: ${passwordValidation.message}`);
+    }
+
+    // 检查新密码不能与旧密码相同
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new BadRequestException('新密码不能与旧密码相同');
     }
 
     // 加密新密码

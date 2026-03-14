@@ -2,13 +2,14 @@
  * 用户管理服务
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { SysUser } from '../../database/entities/sys-user.entity';
+import { validatePassword } from '../../common/utils/password.util';
 
 @Injectable()
 export class UserService {
@@ -99,6 +100,12 @@ export class UserService {
       throw new BadRequestException('邮箱已存在');
     }
 
+    // 【安全修复】验证密码复杂度
+    const passwordValidation = validatePassword(data.password);
+    if (!passwordValidation.valid) {
+      throw new BadRequestException(`密码不符合要求: ${passwordValidation.message}`);
+    }
+
     // 加密密码
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -173,6 +180,12 @@ export class UserService {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('用户不存在');
+    }
+
+    // 【安全修复】验证密码复杂度
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      throw new BadRequestException(`密码不符合要求: ${passwordValidation.message}`);
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
