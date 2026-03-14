@@ -8,6 +8,7 @@ export * from './table-meta'
 export * from './dynamic-data'
 export * from './ai-model'
 export * from './auth'
+export * from './user'
 
 // token-usage 中有与 ai-model 冲突的函数，使用显式导出
 export {

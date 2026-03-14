@@ -44,6 +44,10 @@ export class AIChatHistory {
   @Column({ type: 'text', nullable: true })
   thinking: string;
 
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
+
   // 创建时间
   @CreateDateColumn()
   createdAt: Date;

@@ -1,9 +1,9 @@
 /**
-* 视图配置实体
-* 创建者：dzh
-* 创建时间：2026-03-12
-* 更新时间：2026-03-12
-*/
+ * 视图配置实体
+ * 创建者：dzh
+ * 创建时间：2026-03-12
+ * 更新时间：2026-03-13
+ */
 import {
   Entity,
   Column,
@@ -49,6 +49,14 @@ export class ViewConfig {
   // 是否为默认视图
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
+
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
+
+  // 更新人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string;
 
   // 创建时间
   @CreateDateColumn()

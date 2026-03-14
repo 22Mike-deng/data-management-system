@@ -2,7 +2,7 @@
  * Token消耗记录实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import {
   Entity,
@@ -51,6 +51,10 @@ export class TokenUsage {
   // 预估费用（元）
   @Column({ type: 'decimal', precision: 10, scale: 6, default: 0 })
   estimatedCost: number;
+
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
 
   // 创建时间
   @CreateDateColumn()

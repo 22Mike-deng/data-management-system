@@ -50,6 +50,14 @@ export class SysUser {
   @Column({ type: 'varchar', length: 50, nullable: true })
   lastLoginIp: string;
 
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
+
+  // 更新人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string;
+
   // 创建时间
   @CreateDateColumn()
   createdAt: Date;

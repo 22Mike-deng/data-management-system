@@ -2,13 +2,14 @@
  * 模型定价配置实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import {
   Entity,
   Column,
   PrimaryColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -40,9 +41,21 @@ export class AIModelPricing {
   @Column({ type: 'date' })
   effectiveDate: Date;
 
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
+
+  // 更新人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string;
+
   // 创建时间
   @CreateDateColumn()
   createdAt: Date;
+
+  // 更新时间
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // 关联模型配置
   @ManyToOne(() => AIModelConfig)

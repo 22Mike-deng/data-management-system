@@ -20,6 +20,7 @@ import {
   Settings,
   LogOut,
   User,
+  Users,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 
@@ -31,6 +32,7 @@ const collapsed = ref(false)
 // 菜单配置
 const menuItems = [
   { key: '/dashboard', title: '工作台', icon: Home },
+  { key: '/user-manage', title: '用户管理', icon: Users },
   { key: '/table-manage', title: '数据表管理', icon: Database },
   { key: '/visualization', title: '数据可视化', icon: BarChart3 },
   { key: '/ai-model', title: 'AI模型管理', icon: Bot },

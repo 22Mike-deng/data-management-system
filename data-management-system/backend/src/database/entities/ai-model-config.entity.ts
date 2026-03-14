@@ -2,7 +2,7 @@
  * AI模型配置实体
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import {
   Entity,
@@ -54,6 +54,14 @@ export class AIModelConfig {
   // 是否为默认模型
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
+
+  // 创建人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string;
+
+  // 更新人ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string;
 
   // 创建时间
   @CreateDateColumn()

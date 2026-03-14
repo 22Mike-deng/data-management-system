@@ -17,6 +17,7 @@ import { ViewConfigModule } from './modules/view-config';
 import { KnowledgeBaseModule } from './modules/knowledge-base';
 import { RedisCacheModule } from './modules/redis-cache';
 import { AuthModule } from './modules/auth';
+import { UserModule } from './modules/user';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AuthModule } from './modules/auth';
     
     // 业务模块
     AuthModule,
+    UserModule,
     TableMetaModule,
     DynamicDataModule,
     AIModelModule,

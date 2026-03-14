@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '工作台', icon: 'home' },
       },
       {
+        path: 'user-manage',
+        name: 'UserManage',
+        component: () => import('@/views/user-manage/index.vue'),
+        meta: { title: '用户管理', icon: 'users' },
+      },
+      {
         path: 'table-manage',
         name: 'TableManage',
         component: () => import('@/views/table-manage/index.vue'),
