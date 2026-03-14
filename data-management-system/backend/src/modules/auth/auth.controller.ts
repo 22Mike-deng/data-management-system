@@ -37,6 +37,25 @@ export class AuthController {
   }
 
   /**
+   * 用户登出
+   * POST /api/auth/logout
+   * 将 Token 加入黑名单，实现安全退出
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Req() req: any) {
+    // 获取当前 Token
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      await this.authService.logout(token);
+    }
+    return {
+      code: 0,
+      message: '退出登录成功',
+    };
+  }
+
+  /**
    * 获取当前用户信息
    * GET /api/auth/me
    */

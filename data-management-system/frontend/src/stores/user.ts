@@ -2,7 +2,7 @@
  * 用户状态管理
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -53,11 +53,20 @@ export const useUserStore = defineStore('user', () => {
 
   /**
    * 登出
+   * 调用后端 API 将 Token 加入黑名单，然后清除本地状态
    */
-  function logout(): void {
-    token.value = null
-    userInfo.value = null
-    localStorage.removeItem('token')
+  async function logout(): Promise<void> {
+    try {
+      // 调用后端 logout API
+      await authApi.logout()
+    } catch {
+      // 忽略错误，继续清除本地状态
+    } finally {
+      // 清除本地状态
+      token.value = null
+      userInfo.value = null
+      localStorage.removeItem('token')
+    }
   }
 
   /**

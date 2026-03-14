@@ -30,15 +30,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
+      passReqToCallback: true, // 允许在 validate 中访问 request
     });
   }
 
   /**
    * 验证JWT载荷
+   * @param req 请求对象
    * @param payload JWT载荷数据
    * @returns 用户实体
    */
-  async validate(payload: { sub: string; username: string }): Promise<SysUser> {
+  async validate(req: any, payload: { sub: string; username: string }): Promise<SysUser> {
+    // 【安全修复】检查 Token 是否在黑名单中
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      const isBlacklisted = await this.authService.isTokenBlacklisted(token);
+      if (isBlacklisted) {
+        throw new UnauthorizedException('登录已失效，请重新登录');
+      }
+    }
+
     const user = await this.authService.validateUser(payload);
     if (!user) {
       throw new UnauthorizedException('无效的认证令牌');

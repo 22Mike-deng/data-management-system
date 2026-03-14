@@ -4,13 +4,17 @@
  * 创建时间：2026-03-13
  * 更新时间：2026-03-14
  */
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { SysUser } from '../../database/entities/sys-user.entity';
 import { validatePassword } from '../../common/utils/password.util';
+import { RedisCacheService } from '../redis-cache';
+
+// Token 黑名单缓存键前缀
+const TOKEN_BLACKLIST_PREFIX = 'token_blacklist';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,7 @@ export class AuthService {
     @InjectRepository(SysUser)
     private userRepository: Repository<SysUser>,
     private jwtService: JwtService,
+    private cacheService: RedisCacheService,
   ) {}
 
   /**
@@ -86,6 +91,42 @@ export class AuthService {
     return this.userRepository.findOne({
       where: { id: payload.sub, status: 0 },
     });
+  }
+
+  /**
+   * 用户登出
+   * 将 Token 加入黑名单，实现安全退出
+   * @param token JWT令牌
+   */
+  async logout(token: string): Promise<void> {
+    try {
+      // 解析 Token 获取过期时间
+      const decoded = this.jwtService.decode(token) as { exp?: number };
+      if (decoded?.exp) {
+        // 计算剩余有效时间（秒）
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = decoded.exp - now;
+        
+        if (ttl > 0) {
+          // 将 Token 加入黑名单，过期时间与 Token 剩余有效期一致
+          const cacheKey = RedisCacheService.buildKey(TOKEN_BLACKLIST_PREFIX, token);
+          await this.cacheService.set(cacheKey, '1', ttl);
+        }
+      }
+    } catch {
+      // Token 解析失败，忽略
+    }
+  }
+
+  /**
+   * 检查 Token 是否在黑名单中
+   * @param token JWT令牌
+   * @returns 是否在黑名单中
+   */
+  async isTokenBlacklisted(token: string): Promise<boolean> {
+    const cacheKey = RedisCacheService.buildKey(TOKEN_BLACKLIST_PREFIX, token);
+    const blacklisted = await this.cacheService.get(cacheKey);
+    return !!blacklisted;
   }
 
   /**

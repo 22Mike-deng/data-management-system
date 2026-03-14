@@ -59,21 +59,10 @@ const handleMenuClick = (key: string) => {
   router.push(key)
 }
 
-// 用户下拉菜单选项
-const userMenuOptions = [
-  { content: '个人设置', value: 'settings', icon: Settings },
-  { content: '退出登录', value: 'logout', icon: LogOut },
-]
-
-// 处理用户菜单点击
-const handleUserMenuClick = (value: string) => {
-  if (value === 'logout') {
-    userStore.logout()
-    router.push('/login')
-  } else if (value === 'settings') {
-    // TODO: 跳转到个人设置页面
-    router.push('/settings')
-  }
+// 处理退出登录
+const handleLogout = async () => {
+  await userStore.logout()
+  router.push('/login')
 }
 
 // 初始化获取用户信息
@@ -133,10 +122,10 @@ onMounted(() => {
 
       <!-- 用户信息区域 -->
       <div class="p-3 border-t border-gray-100">
-        <t-dropdown
-          :options="userMenuOptions"
-          @click="handleUserMenuClick"
-          placement="top"
+        <t-popup
+          placement="top-left"
+          trigger="click"
+          :overlay-style="{ padding: '4px 0' }"
         >
           <div
             class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
@@ -159,7 +148,25 @@ onMounted(() => {
               </p>
             </div>
           </div>
-        </t-dropdown>
+          <template #content>
+            <div class="bg-white rounded-lg shadow-lg border border-gray-100 py-1 min-w-[140px]">
+              <div
+                class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                @click="router.push('/settings')"
+              >
+                <Settings class="w-4 h-4" />
+                <span>个人设置</span>
+              </div>
+              <div
+                class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+                @click="handleLogout"
+              >
+                <LogOut class="w-4 h-4" />
+                <span>退出登录</span>
+              </div>
+            </div>
+          </template>
+        </t-popup>
       </div>
 
       <!-- 折叠按钮 -->
