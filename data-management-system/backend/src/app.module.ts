@@ -16,6 +16,7 @@ import { TokenUsageModule } from './modules/token-usage';
 import { ViewConfigModule } from './modules/view-config';
 import { KnowledgeBaseModule } from './modules/knowledge-base';
 import { RedisCacheModule } from './modules/redis-cache';
+import { AuthModule } from './modules/auth';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { RedisCacheModule } from './modules/redis-cache';
     }),
     
     // 业务模块
+    AuthModule,
     TableMetaModule,
     DynamicDataModule,
     AIModelModule,
