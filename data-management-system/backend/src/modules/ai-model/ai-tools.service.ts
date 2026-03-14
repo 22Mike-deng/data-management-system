@@ -310,6 +310,66 @@ export class AIToolsService {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'delete_record',
+          description: '删除表中指定ID的记录。删除前应该先确认用户意图，并告知删除后无法恢复。',
+          parameters: {
+            type: 'object',
+            properties: {
+              tableName: {
+                type: 'string',
+                description: '表名称（不需要带data_前缀）',
+              },
+              recordId: {
+                type: 'string',
+                description: '要删除的记录ID（主键），通常是从查询结果中获取的id字段',
+              },
+            },
+            required: ['tableName', 'recordId'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'batch_delete_records',
+          description: '批量删除表中指定ID列表的记录。删除前应该先确认用户意图，并告知删除后无法恢复。',
+          parameters: {
+            type: 'object',
+            properties: {
+              tableName: {
+                type: 'string',
+                description: '表名称（不需要带data_前缀）',
+              },
+              recordIds: {
+                type: 'array',
+                description: '要删除的记录ID列表',
+                items: { type: 'string' },
+              },
+            },
+            required: ['tableName', 'recordIds'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_table_stats',
+          description: '获取表的统计信息，包括记录数、字段统计、创建/更新时间等',
+          parameters: {
+            type: 'object',
+            properties: {
+              tableName: {
+                type: 'string',
+                description: '表名称（不需要带data_前缀）',
+              },
+            },
+            required: ['tableName'],
+          },
+        },
+      },
     ];
 
     // 知识库查询工具（可选）
@@ -380,6 +440,15 @@ export class AIToolsService {
           break;
         case 'search_field':
           result = await this.searchField(args.keyword);
+          break;
+        case 'delete_record':
+          result = await this.deleteRecord(args.tableName, args.recordId);
+          break;
+        case 'batch_delete_records':
+          result = await this.batchDeleteRecords(args.tableName, args.recordIds);
+          break;
+        case 'get_table_stats':
+          result = await this.getTableStats(args.tableName);
           break;
         case 'search_knowledge':
           result = await this.searchKnowledge(args.query, args.limit);
@@ -1118,5 +1187,182 @@ export class AIToolsService {
         tableStructures: [],
       };
     }
+  }
+
+  /**
+   * 删除记录
+   */
+  private async deleteRecord(tableName: string, recordId: string): Promise<any> {
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}`);
+    }
+
+    const fullTableName = `data_${tableName}`;
+
+    // 检查表是否存在
+    const tableExists = await this.dataSource.query(`
+      SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    if (tableExists[0].count === 0) {
+      throw new Error(`表 ${tableName} 不存在`);
+    }
+
+    // 检查记录是否存在
+    const existingRecord = await this.dataSource.query(
+      `SELECT * FROM ?? WHERE id = ?`,
+      [fullTableName, recordId]
+    );
+
+    if (existingRecord.length === 0) {
+      throw new Error(`记录不存在: ID = ${recordId}`);
+    }
+
+    // 删除记录
+    const result = await this.dataSource.query(
+      `DELETE FROM ?? WHERE id = ?`,
+      [fullTableName, recordId]
+    );
+
+    return {
+      success: true,
+      message: `成功删除表 ${tableName} 中的记录 (ID: ${recordId})`,
+      recordId,
+      affectedRows: result.affectedRows,
+    };
+  }
+
+  /**
+   * 批量删除记录
+   */
+  private async batchDeleteRecords(tableName: string, recordIds: string[]): Promise<any> {
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}`);
+    }
+
+    if (!Array.isArray(recordIds) || recordIds.length === 0) {
+      throw new Error('请提供要删除的记录ID列表');
+    }
+
+    // 批量删除限制
+    if (recordIds.length > 100) {
+      throw new Error('批量删除最多支持100条记录');
+    }
+
+    const fullTableName = `data_${tableName}`;
+
+    // 检查表是否存在
+    const tableExists = await this.dataSource.query(`
+      SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    if (tableExists[0].count === 0) {
+      throw new Error(`表 ${tableName} 不存在`);
+    }
+
+    // 构建批量删除SQL
+    const placeholders = recordIds.map(() => '?').join(', ');
+    const result = await this.dataSource.query(
+      `DELETE FROM ?? WHERE id IN (${placeholders})`,
+      [fullTableName, ...recordIds]
+    );
+
+    return {
+      success: true,
+      message: `成功删除表 ${tableName} 中的 ${result.affectedRows} 条记录`,
+      requestedCount: recordIds.length,
+      affectedRows: result.affectedRows,
+    };
+  }
+
+  /**
+   * 获取表统计信息
+   */
+  private async getTableStats(tableName: string): Promise<any> {
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}`);
+    }
+
+    const fullTableName = `data_${tableName}`;
+
+    // 检查表是否存在
+    const tableExists = await this.dataSource.query(`
+      SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    if (tableExists[0].count === 0) {
+      throw new Error(`表 ${tableName} 不存在`);
+    }
+
+    // 获取表基本信息
+    const tableInfo = await this.dataSource.query(`
+      SELECT TABLE_ROWS as rowCount, 
+             DATA_LENGTH as dataLength,
+             INDEX_LENGTH as indexLength,
+             CREATE_TIME as createTime,
+             UPDATE_TIME as updateTime,
+             TABLE_COMMENT as tableComment
+      FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    `, [fullTableName]);
+
+    // 获取字段统计
+    const fieldStats = await this.dataSource.query(`
+      SELECT 
+        COLUMN_NAME as field,
+        DATA_TYPE as type,
+        IS_NULLABLE as nullable,
+        COUNT(DISTINCT ??) as distinctValues,
+        COUNT(*) as totalValues,
+        SUM(CASE WHEN ?? IS NULL THEN 1 ELSE 0 END) as nullCount
+      FROM INFORMATION_SCHEMA.COLUMNS
+      CROSS JOIN ??
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+      GROUP BY COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+    `, [fullTableName, fullTableName, fullTableName, fullTableName]);
+
+    // 获取创建时间和更新时间范围
+    const timeRange = await this.dataSource.query(`
+      SELECT 
+        MIN(created_at) as earliestRecord,
+        MAX(created_at) as latestRecord,
+        MIN(updated_at) as earliestUpdate,
+        MAX(updated_at) as latestUpdate
+      FROM ??
+    `, [fullTableName]);
+
+    const info = tableInfo[0] || {};
+    const times = timeRange[0] || {};
+
+    return {
+      tableName,
+      stats: {
+        rowCount: info.rowCount || 0,
+        dataLength: info.dataLength || 0,
+        indexLength: info.indexLength || 0,
+        tableComment: info.tableComment,
+      },
+      timeRange: {
+        createTime: info.createTime,
+        updateTime: info.updateTime,
+        earliestRecord: times.earliestRecord,
+        latestRecord: times.latestRecord,
+        earliestUpdate: times.earliestUpdate,
+        latestUpdate: times.latestUpdate,
+      },
+      fieldStats: fieldStats.map((f: any) => ({
+        field: f.field,
+        type: f.type,
+        nullable: f.nullable === 'YES',
+        distinctValues: f.distinctValues,
+        totalValues: f.totalValues,
+        nullCount: f.nullCount,
+      })),
+    };
   }
 }

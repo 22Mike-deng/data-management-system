@@ -2,7 +2,7 @@
  * 数据可视化页面 - 重构版
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  * 
  * 功能特性：
  * 1. 支持单表统计查询
@@ -15,6 +15,7 @@ import {
   BarChart3, PieChart, LineChart, RefreshCw, Plus, Save, Trash2, 
   Star, Bookmark, X, Table2, Link2, Layers, Calculator, Filter
 } from 'lucide-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { getTableList, getTableFields } from '@/api/table-meta'
 import { getDataList, aggregateQuery } from '@/api/dynamic-data'
 import type { AggregateConfig, GroupByConfig, AggregateQueryDto } from '@/api/dynamic-data'
@@ -301,7 +302,7 @@ const handleAddJoinTable = async () => {
   )
   
   if (availableTables.length === 0) {
-    alert('没有可关联的表')
+    MessagePlugin.warning('没有可关联的表')
     return
   }
   
@@ -391,17 +392,17 @@ const handleRemoveFilter = (index: number) => {
 // 执行统计查询
 const executeQuery = async () => {
   if (!queryConfig.mainTable) {
-    alert('请先选择数据表')
+    MessagePlugin.warning('请先选择数据表')
     return
   }
   
   if (queryConfig.statistics.length === 0) {
-    alert('请至少添加一个统计项')
+    MessagePlugin.warning('请至少添加一个统计项')
     return
   }
   
   if (queryConfig.groupBy.length === 0) {
-    alert('请至少添加一个分组字段')
+    MessagePlugin.warning('请至少添加一个分组字段')
     return
   }
   
@@ -417,7 +418,7 @@ const executeQuery = async () => {
     }
   } catch (error) {
     console.error('查询执行失败:', error)
-    alert('查询执行失败，请检查配置')
+    MessagePlugin.error('查询执行失败，请检查配置')
   } finally {
     loading.value = false
   }
@@ -651,10 +652,43 @@ const formatDateValue = (value: any, granularity: string): string => {
 
 // ==================== 视图管理 ====================
 
-const applyView = (view: ViewConfig) => {
+/**
+ * 应用视图配置
+ * 从视图配置恢复查询参数
+ */
+const applyView = async (view: ViewConfig) => {
   selectedView.value = view
   selectedChartType.value = view.chartType
-  // TODO: 从视图配置恢复查询配置
+  
+  try {
+    // 解析分组配置
+    if (view.xAxis) {
+      const groupByConfig = JSON.parse(view.xAxis)
+      if (Array.isArray(groupByConfig)) {
+        queryConfig.groupBy = groupByConfig
+      }
+    }
+    
+    // 解析统计配置
+    if (view.yAxis) {
+      const statisticsConfig = JSON.parse(view.yAxis)
+      if (Array.isArray(statisticsConfig)) {
+        queryConfig.statistics = statisticsConfig
+      }
+    }
+    
+    // 恢复筛选条件
+    if (view.filters && Array.isArray(view.filters)) {
+      queryConfig.filters = view.filters
+    }
+    
+    // 如果配置完整，自动执行查询
+    if (queryConfig.statistics.length > 0) {
+      await executeQuery()
+    }
+  } catch (error) {
+    console.error('恢复视图配置失败:', error)
+  }
 }
 
 const openSaveModal = () => {
@@ -670,7 +704,7 @@ const openSaveModal = () => {
 
 const handleSaveView = async () => {
   if (!saveViewName.value.trim()) {
-    alert('请输入视图名称')
+    MessagePlugin.warning('请输入视图名称')
     return
   }
   saveLoading.value = true
@@ -696,7 +730,7 @@ const handleSaveView = async () => {
     showSaveModal.value = false
   } catch (error) {
     console.error('保存视图失败:', error)
-    alert('保存失败，请重试')
+    MessagePlugin.error('保存失败，请重试')
   } finally {
     saveLoading.value = false
   }
@@ -733,7 +767,7 @@ const confirmDeleteView = async () => {
     showDeleteConfirm.value = false
   } catch (error) {
     console.error('删除视图失败:', error)
-    alert('删除失败，请重试')
+    MessagePlugin.error('删除失败，请重试')
   } finally {
     deleteLoading.value = false
   }
@@ -813,17 +847,17 @@ watch(() => queryConfig.mainTable, (val) => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn">
+  <div class="space-y-6 animate-fadeIn visualization-page">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">数据可视化</h2>
-        <p class="text-sm text-gray-500 mt-1">可视化配置统计查询，支持单表和关联表联合统计</p>
+        <h2 class="text-xl font-semibold page-title">数据可视化</h2>
+        <p class="text-sm page-desc mt-1">可视化配置统计查询，支持单表和关联表联合统计</p>
       </div>
       <div class="flex items-center gap-2">
         <button
           v-if="queryConfig.mainTable"
-          class="flex items-center gap-2 px-3 py-2 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 text-primary primary-bg-light rounded-lg hover:bg-primary/20 transition-colors"
           @click="openSaveModal"
         >
           <Save class="w-4 h-4" />
@@ -831,7 +865,7 @@ watch(() => queryConfig.mainTable, (val) => {
         </button>
         <button
           v-if="queryConfig.mainTable"
-          class="flex items-center gap-2 px-4 py-2 text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
+          class="flex items-center gap-2 px-4 py-2 text-white primary-btn rounded-lg transition-colors"
           :disabled="loading"
           @click="executeQuery"
         >
@@ -845,18 +879,18 @@ watch(() => queryConfig.mainTable, (val) => {
       <!-- 左侧配置面板 -->
       <div class="lg:col-span-1 space-y-4">
         <!-- 1. 数据源配置 -->
-        <div class="bg-white rounded-xl shadow-sm p-4">
+        <div class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center gap-2 mb-3">
             <Table2 class="w-4 h-4 text-primary" />
-            <h3 class="text-sm font-medium text-gray-800">数据源</h3>
+            <h3 class="text-sm font-medium card-title">数据源</h3>
           </div>
           
           <!-- 主表选择 -->
           <div class="mb-3">
-            <label class="block text-xs text-gray-500 mb-1">主表 *</label>
+            <label class="block text-xs label-text mb-1">主表 *</label>
             <select
               :value="queryConfig.mainTable"
-              class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-select"
               @change="handleSelectMainTable(($event.target as HTMLSelectElement).value)"
             >
               <option value="">请选择数据表</option>
@@ -869,7 +903,7 @@ watch(() => queryConfig.mainTable, (val) => {
           <!-- 关联表 -->
           <div v-if="queryConfig.mainTable">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs text-gray-500">关联表</span>
+              <span class="text-xs label-text">关联表</span>
               <button
                 class="text-xs text-primary hover:text-primary-dark"
                 @click="handleAddJoinTable"
@@ -882,10 +916,10 @@ watch(() => queryConfig.mainTable, (val) => {
               <div
                 v-for="(joinTable, index) in queryConfig.joinTables"
                 :key="joinTable.tableId"
-                class="p-2 bg-gray-50 rounded-lg text-xs"
+                class="p-2 config-item rounded-lg text-xs"
               >
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-medium text-gray-700">{{ joinTable.displayName }}</span>
+                  <span class="font-medium item-title">{{ joinTable.displayName }}</span>
                   <button
                     class="text-gray-400 hover:text-red-500"
                     @click="handleRemoveJoinTable(index)"
@@ -893,30 +927,30 @@ watch(() => queryConfig.mainTable, (val) => {
                     <X class="w-3 h-3" />
                   </button>
                 </div>
-                <div class="grid grid-cols-2 gap-1 text-gray-500">
+                <div class="grid grid-cols-2 gap-1 label-text">
                   <div>关联方式: {{ joinTable.joinType }}</div>
                   <div>别名: {{ joinTable.alias }}</div>
                 </div>
               </div>
             </div>
-            <div v-else class="text-xs text-gray-400 text-center py-2">
+            <div v-else class="text-xs placeholder-text text-center py-2">
               可添加关联表进行联合查询
             </div>
           </div>
         </div>
 
         <!-- 已保存的视图 -->
-        <div v-if="queryConfig.mainTable && viewList.length > 0" class="bg-white rounded-xl shadow-sm p-4">
+        <div v-if="queryConfig.mainTable && viewList.length > 0" class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center gap-2 mb-3">
             <Bookmark class="w-4 h-4 text-primary" />
-            <h3 class="text-sm font-medium text-gray-800">已保存视图</h3>
+            <h3 class="text-sm font-medium card-title">已保存视图</h3>
           </div>
           <div class="space-y-2">
             <div
               v-for="view in viewList"
               :key="view.viewId"
               class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors"
-              :class="selectedView?.viewId === view.viewId ? 'bg-primary/10 border border-primary' : 'bg-gray-50 hover:bg-gray-100'"
+              :class="selectedView?.viewId === view.viewId ? 'view-active' : 'view-item'"
               @click="handleSelectView(view)"
             >
               <div class="flex items-center gap-2">
@@ -946,11 +980,11 @@ watch(() => queryConfig.mainTable, (val) => {
         </div>
 
         <!-- 2. 统计配置 -->
-        <div v-if="queryConfig.mainTable" class="bg-white rounded-xl shadow-sm p-4">
+        <div v-if="queryConfig.mainTable" class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
               <Calculator class="w-4 h-4 text-primary" />
-              <h3 class="text-sm font-medium text-gray-800">统计配置</h3>
+              <h3 class="text-sm font-medium card-title">统计配置</h3>
             </div>
             <button
               class="text-xs text-primary hover:text-primary-dark"
@@ -960,7 +994,7 @@ watch(() => queryConfig.mainTable, (val) => {
             </button>
           </div>
           
-          <div v-if="queryConfig.statistics.length === 0" class="text-xs text-gray-400 text-center py-2">
+          <div v-if="queryConfig.statistics.length === 0" class="text-xs placeholder-text text-center py-2">
             请添加统计项
           </div>
           
@@ -968,12 +1002,12 @@ watch(() => queryConfig.mainTable, (val) => {
             <div
               v-for="(stat, index) in queryConfig.statistics"
               :key="index"
-              class="p-2 bg-gray-50 rounded-lg"
+              class="p-2 config-item rounded-lg"
             >
               <div class="flex items-center justify-between mb-2">
                 <select
                   v-model="stat.type"
-                  class="flex-1 px-2 py-1 text-xs border border-gray-200 rounded"
+                  class="flex-1 px-2 py-1 text-xs border rounded form-select"
                 >
                   <option v-for="opt in statisticsTypes" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
@@ -989,7 +1023,7 @@ watch(() => queryConfig.mainTable, (val) => {
               <div v-if="stat.type !== 'COUNT'" class="text-xs">
                 <select
                   v-model="stat.field"
-                  class="w-full px-2 py-1 border border-gray-200 rounded"
+                  class="w-full px-2 py-1 border rounded form-select"
                 >
                   <option value="">选择字段</option>
                   <optgroup label="主表字段">
@@ -1017,11 +1051,11 @@ watch(() => queryConfig.mainTable, (val) => {
         </div>
 
         <!-- 3. 分组配置 -->
-        <div v-if="queryConfig.mainTable" class="bg-white rounded-xl shadow-sm p-4">
+        <div v-if="queryConfig.mainTable" class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
               <Layers class="w-4 h-4 text-primary" />
-              <h3 class="text-sm font-medium text-gray-800">分组字段</h3>
+              <h3 class="text-sm font-medium card-title">分组字段</h3>
             </div>
             <button
               class="text-xs text-primary hover:text-primary-dark"
@@ -1031,7 +1065,7 @@ watch(() => queryConfig.mainTable, (val) => {
             </button>
           </div>
           
-          <div v-if="queryConfig.groupBy.length === 0" class="text-xs text-gray-400 text-center py-2">
+          <div v-if="queryConfig.groupBy.length === 0" class="text-xs placeholder-text text-center py-2">
             请添加分组字段
           </div>
           
@@ -1039,12 +1073,12 @@ watch(() => queryConfig.mainTable, (val) => {
             <div
               v-for="(gb, index) in queryConfig.groupBy"
               :key="index"
-              class="p-2 bg-gray-50 rounded-lg"
+              class="p-2 config-item rounded-lg"
             >
               <div class="flex items-center justify-between mb-2">
                 <select
                   v-model="gb.field"
-                  class="flex-1 px-2 py-1 text-xs border border-gray-200 rounded"
+                  class="flex-1 px-2 py-1 text-xs border rounded form-select"
                   @change="gb.fieldTable = allTableFields.find(f => f.field.fieldName === gb.field)?.tableId || ''"
                 >
                   <option value="">选择分组字段</option>
@@ -1076,7 +1110,7 @@ watch(() => queryConfig.mainTable, (val) => {
               </div>
               <!-- 时间粒度选择 -->
               <div v-if="gb.field && dateFields.some(f => f.field.fieldName === gb.field)" class="text-xs">
-                <select v-model="gb.timeGranularity" class="w-full px-2 py-1 border border-gray-200 rounded">
+                <select v-model="gb.timeGranularity" class="w-full px-2 py-1 border rounded form-select">
                   <option value="day">按日</option>
                   <option value="week">按周</option>
                   <option value="month">按月</option>
@@ -1088,11 +1122,11 @@ watch(() => queryConfig.mainTable, (val) => {
         </div>
 
         <!-- 4. 筛选条件 -->
-        <div v-if="queryConfig.mainTable" class="bg-white rounded-xl shadow-sm p-4">
+        <div v-if="queryConfig.mainTable" class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
               <Filter class="w-4 h-4 text-primary" />
-              <h3 class="text-sm font-medium text-gray-800">筛选条件</h3>
+              <h3 class="text-sm font-medium card-title">筛选条件</h3>
             </div>
             <button
               class="text-xs text-primary hover:text-primary-dark"
@@ -1102,7 +1136,7 @@ watch(() => queryConfig.mainTable, (val) => {
             </button>
           </div>
           
-          <div v-if="queryConfig.filters.length === 0" class="text-xs text-gray-400 text-center py-2">
+          <div v-if="queryConfig.filters.length === 0" class="text-xs placeholder-text text-center py-2">
             暂无筛选条件
           </div>
           
@@ -1110,11 +1144,11 @@ watch(() => queryConfig.mainTable, (val) => {
             <div
               v-for="(filter, index) in queryConfig.filters"
               :key="index"
-              class="flex items-center gap-1 p-2 bg-gray-50 rounded-lg"
+              class="flex items-center gap-1 p-2 config-item rounded-lg"
             >
               <select
                 v-model="filter.field"
-                class="flex-1 px-1 py-1 text-xs border border-gray-200 rounded"
+                class="flex-1 px-1 py-1 text-xs border rounded form-select"
               >
                 <option v-for="item in filterableFields" :key="item.field.fieldId" :value="item.field.fieldName">
                   {{ item.field.displayName }}
@@ -1122,7 +1156,7 @@ watch(() => queryConfig.mainTable, (val) => {
               </select>
               <select
                 v-model="filter.operator"
-                class="w-14 px-1 py-1 text-xs border border-gray-200 rounded"
+                class="w-14 px-1 py-1 text-xs border rounded form-select"
               >
                 <option v-for="op in filterOperators" :key="op.value" :value="op.value">
                   {{ op.label.substring(0, 2) }}
@@ -1132,7 +1166,7 @@ watch(() => queryConfig.mainTable, (val) => {
                 v-model="filter.value"
                 type="text"
                 placeholder="值"
-                class="flex-1 px-1 py-1 text-xs border border-gray-200 rounded"
+                class="flex-1 px-1 py-1 text-xs border rounded form-input"
               />
               <button
                 class="text-gray-400 hover:text-red-500"
@@ -1148,19 +1182,19 @@ watch(() => queryConfig.mainTable, (val) => {
       <!-- 右侧图表展示区域 -->
       <div class="lg:col-span-3 space-y-4">
         <!-- 图表类型选择 -->
-        <div class="bg-white rounded-xl shadow-sm p-4">
+        <div class="config-card rounded-xl shadow-sm p-4">
           <div class="flex items-center gap-4">
-            <span class="text-sm text-gray-500">图表类型:</span>
+            <span class="text-sm label-text">图表类型:</span>
             <div class="flex gap-2">
               <div
                 v-for="type in chartTypes"
                 :key="type.key"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                :class="selectedChartType === type.key ? 'bg-primary/10 border border-primary' : 'bg-gray-50 border border-transparent hover:bg-gray-100'"
+                :class="selectedChartType === type.key ? 'chart-type-active' : 'chart-type-item'"
                 @click="selectedChartType = type.key"
               >
                 <component :is="type.icon" class="w-4 h-4" :class="selectedChartType === type.key ? 'text-primary' : 'text-gray-500'" />
-                <span class="text-xs" :class="selectedChartType === type.key ? 'text-primary' : 'text-gray-600'">
+                <span class="text-xs" :class="selectedChartType === type.key ? 'text-primary' : 'label-text'">
                   {{ type.title }}
                 </span>
               </div>
@@ -1169,16 +1203,16 @@ watch(() => queryConfig.mainTable, (val) => {
         </div>
 
         <!-- 图表展示 -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="config-card rounded-xl shadow-sm p-6">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-medium text-gray-800">统计结果</h3>
-            <span v-if="selectedView" class="text-xs text-gray-500">
+            <h3 class="text-sm font-medium card-title">统计结果</h3>
+            <span v-if="selectedView" class="text-xs label-text">
               当前视图: {{ selectedView.viewName }}
             </span>
           </div>
           
           <!-- 无数据提示 -->
-          <div v-if="statisticsResult.labels.length === 0" class="h-96 flex items-center justify-center text-gray-400">
+          <div v-if="statisticsResult.labels.length === 0" class="h-96 flex items-center justify-center placeholder-text">
             <div class="text-center">
               <BarChart3 class="w-16 h-16 mx-auto mb-4 opacity-50" />
               <p v-if="!queryConfig.mainTable">请选择数据表并配置统计</p>
@@ -1363,27 +1397,27 @@ watch(() => queryConfig.mainTable, (val) => {
           <!-- 数据表 -->
           <div v-else-if="selectedChartType === 'table'" class="overflow-x-auto">
             <table class="w-full">
-              <thead class="bg-gray-50">
+              <thead class="table-header">
                 <tr>
-                  <th class="text-left px-4 py-3 text-sm font-medium text-gray-500">分组</th>
-                  <th class="text-right px-4 py-3 text-sm font-medium text-gray-500">数值</th>
-                  <th class="text-right px-4 py-3 text-sm font-medium text-gray-500">占比</th>
+                  <th class="text-left px-4 py-3 text-sm font-medium th-text">分组</th>
+                  <th class="text-right px-4 py-3 text-sm font-medium th-text">数值</th>
+                  <th class="text-right px-4 py-3 text-sm font-medium th-text">占比</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr v-for="(label, index) in statisticsResult.labels" :key="index" class="hover:bg-gray-50">
-                  <td class="px-4 py-3 text-sm text-gray-800">{{ label }}</td>
-                  <td class="px-4 py-3 text-sm text-gray-800 text-right font-medium">{{ statisticsResult.values[index].toLocaleString() }}</td>
-                  <td class="px-4 py-3 text-sm text-gray-500 text-right">
+              <tbody class="divide-y table-divider">
+                <tr v-for="(label, index) in statisticsResult.labels" :key="index" class="table-row">
+                  <td class="px-4 py-3 text-sm td-text">{{ label }}</td>
+                  <td class="px-4 py-3 text-sm td-text text-right font-medium">{{ statisticsResult.values[index].toLocaleString() }}</td>
+                  <td class="px-4 py-3 text-sm td-secondary text-right">
                     {{ ((statisticsResult.values[index] / statisticsResult.values.reduce((a, b) => a + b, 0)) * 100).toFixed(1) }}%
                   </td>
                 </tr>
               </tbody>
-              <tfoot class="bg-gray-50">
+              <tfoot class="table-header">
                 <tr>
-                  <td class="px-4 py-3 text-sm font-medium text-gray-800">合计</td>
-                  <td class="px-4 py-3 text-sm font-medium text-gray-800 text-right">{{ statisticsResult.values.reduce((a, b) => a + b, 0).toLocaleString() }}</td>
-                  <td class="px-4 py-3 text-sm text-gray-500 text-right">100%</td>
+                  <td class="px-4 py-3 text-sm font-medium td-text">合计</td>
+                  <td class="px-4 py-3 text-sm font-medium td-text text-right">{{ statisticsResult.values.reduce((a, b) => a + b, 0).toLocaleString() }}</td>
+                  <td class="px-4 py-3 text-sm td-secondary text-right">100%</td>
                 </tr>
               </tfoot>
             </table>
@@ -1396,26 +1430,26 @@ watch(() => queryConfig.mainTable, (val) => {
     <Modal v-model:visible="showSaveModal" title="保存视图" width="400px">
       <div class="p-4 space-y-4">
         <div>
-          <label class="block text-sm text-gray-600 mb-2">视图名称</label>
+          <label class="block text-sm label-text mb-2">视图名称</label>
           <input
             v-model="saveViewName"
             type="text"
             placeholder="请输入视图名称"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
           />
         </div>
         <div class="flex items-center gap-2">
-          <input type="checkbox" id="setDefault" v-model="saveAsDefault" class="rounded border-gray-300 text-primary focus:ring-primary" />
-          <label for="setDefault" class="text-sm text-gray-600">设为默认视图</label>
+          <input type="checkbox" id="setDefault" v-model="saveAsDefault" class="rounded text-primary focus:ring-primary" />
+          <label for="setDefault" class="text-sm label-text">设为默认视图</label>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <button class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" @click="showSaveModal = false">
+          <button class="px-4 py-2 secondary-btn rounded-lg transition-colors" @click="showSaveModal = false">
             取消
           </button>
           <button
-            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            class="px-4 py-2 primary-btn rounded-lg transition-colors disabled:opacity-50"
             :disabled="saveLoading"
             @click="handleSaveView"
           >
@@ -1437,3 +1471,121 @@ watch(() => queryConfig.mainTable, (val) => {
     />
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.visualization-page {
+  background-color: var(--color-bg-layout);
+}
+
+.page-title {
+  color: var(--color-text-primary);
+}
+
+.page-desc {
+  color: var(--color-text-secondary);
+}
+
+.primary-bg-light {
+  background-color: var(--color-primary-bg);
+}
+
+.primary-btn {
+  background-color: var(--color-primary);
+}
+
+.primary-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.config-card {
+  background-color: var(--color-bg-container);
+}
+
+.card-title {
+  color: var(--color-text-primary);
+}
+
+.label-text {
+  color: var(--color-text-secondary);
+}
+
+.placeholder-text {
+  color: var(--color-text-placeholder);
+}
+
+.form-select,
+.form-input {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.config-item {
+  background-color: var(--color-bg-active);
+}
+
+.item-title {
+  color: var(--color-text-primary);
+}
+
+.view-item {
+  background-color: var(--color-bg-active);
+}
+
+.view-item:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.view-active {
+  background-color: var(--color-primary-bg);
+  border: 1px solid var(--color-primary);
+}
+
+.chart-type-item {
+  background-color: var(--color-bg-active);
+  border: 1px solid transparent;
+}
+
+.chart-type-item:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.chart-type-active {
+  background-color: var(--color-primary-bg);
+  border: 1px solid var(--color-primary);
+}
+
+.table-header {
+  background-color: var(--color-bg-active);
+}
+
+.th-text {
+  color: var(--color-text-secondary);
+}
+
+.table-divider {
+  border-color: var(--color-border);
+}
+
+.table-row:hover {
+  background-color: var(--color-bg-active);
+}
+
+.td-text {
+  color: var(--color-text-primary);
+}
+
+.td-secondary {
+  color: var(--color-text-secondary);
+}
+
+.secondary-btn {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.secondary-btn:hover {
+  background-color: var(--color-border);
+}
+</style>

@@ -242,8 +242,8 @@ onMounted(() => {
     <!-- 操作栏 -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">知识库管理</h2>
-        <p class="text-sm text-gray-500 mt-1">管理系统知识库，供AI对话调用</p>
+        <h2 class="text-xl font-semibold page-title">知识库管理</h2>
+        <p class="text-sm page-desc mt-1">管理系统知识库，供AI对话调用</p>
       </div>
       <button
         class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
@@ -636,3 +636,69 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* 页面标题 - 覆盖 Tailwind 硬编码颜色 */
+:deep(.text-gray-800) {
+  color: var(--color-text-primary);
+}
+:deep(.text-gray-700) {
+  color: var(--color-text-primary);
+}
+:deep(.text-gray-600) {
+  color: var(--color-text-secondary);
+}
+:deep(.text-gray-500) {
+  color: var(--color-text-secondary);
+}
+:deep(.text-gray-400) {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+/* 背景色 */
+:deep(.bg-white) {
+  background-color: var(--color-bg-container);
+}
+:deep(.bg-gray-50) {
+  background-color: var(--color-bg-layout);
+}
+:deep(.bg-gray-100) {
+  background-color: var(--color-bg-active);
+}
+
+/* 边框 */
+:deep(.border-gray-100) {
+  border-color: var(--color-border);
+}
+:deep(.border-gray-200) {
+  border-color: var(--color-border);
+}
+
+/* 输入框 */
+:deep(input[type="text"]),
+:deep(input[type="number"]),
+:deep(textarea),
+:deep(select) {
+  background-color: var(--color-bg-layout);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+:deep(input::placeholder),
+:deep(textarea::placeholder) {
+  color: var(--color-text-secondary);
+}
+
+/* 悬停状态 */
+:deep(.hover\:bg-gray-50:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:bg-gray-100:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:bg-gray-200:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:text-gray-600:hover) {
+  color: var(--color-text-primary);
+}
+</style>

@@ -594,7 +594,7 @@ onMounted(() => {
 <style scoped lang="less">
 .user-manage-page {
   padding: 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+  background-color: var(--color-bg-layout);
   min-height: calc(100vh - 60px);
 }
 
@@ -604,13 +604,13 @@ onMounted(() => {
   .page-title {
     font-size: 24px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--color-text-primary);
     margin: 0 0 8px 0;
   }
   
   .page-desc {
     font-size: 14px;
-    color: #666;
+    color: var(--color-text-secondary);
     margin: 0;
   }
 }
@@ -618,6 +618,7 @@ onMounted(() => {
 .search-card {
   margin-bottom: 16px;
   border-radius: 12px;
+  background-color: var(--color-bg-container);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   
   .search-input {
@@ -635,6 +636,7 @@ onMounted(() => {
 
 .table-card {
   border-radius: 12px;
+  background-color: var(--color-bg-container);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   
   .card-header {
@@ -650,7 +652,7 @@ onMounted(() => {
       .card-title {
         font-size: 16px;
         font-weight: 600;
-        color: #1a1a1a;
+        color: var(--color-text-primary);
       }
     }
     
@@ -669,26 +671,26 @@ onMounted(() => {
 .user-info-cell {
   .user-name {
     font-weight: 500;
-    color: #1a1a1a;
+    color: var(--color-text-primary);
     margin-bottom: 2px;
   }
   
   .user-nickname {
     font-size: 12px;
-    color: #999;
+    color: var(--color-text-placeholder);
   }
 }
 
 .email-cell {
   display: flex;
   align-items: center;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .time-cell {
   display: flex;
   align-items: center;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -715,13 +717,13 @@ onMounted(() => {
       .username {
         font-size: 16px;
         font-weight: 500;
-        color: #1a1a1a;
+        color: var(--color-text-primary);
         margin-bottom: 4px;
       }
       
       .email {
         font-size: 13px;
-        color: #666;
+        color: var(--color-text-secondary);
       }
     }
   }

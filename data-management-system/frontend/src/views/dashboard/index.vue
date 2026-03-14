@@ -107,87 +107,87 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn">
+  <div class="space-y-6 animate-fadeIn dashboard-page">
     <!-- 欢迎区域 -->
-    <div class="bg-gradient-to-r from-primary to-primary-dark rounded-xl p-8 text-white">
+    <div class="welcome-banner rounded-xl p-8 text-white">
       <h1 class="text-2xl font-bold">欢迎使用数据管理可视化系统</h1>
       <p class="mt-2 opacity-90">高效管理您的数据，智能AI助手助您一臂之力</p>
     </div>
 
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/table-manage')">
+      <div class="stat-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/table-manage')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500">数据表</p>
-            <p class="text-2xl font-bold text-gray-800 mt-1">{{ stats.tables }}</p>
+            <p class="text-sm stat-label">数据表</p>
+            <p class="text-2xl font-bold stat-value mt-1">{{ stats.tables }}</p>
           </div>
-          <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-            <Table2 class="w-6 h-6 text-blue-600" />
+          <div class="w-12 h-12 stat-icon-bg rounded-full flex items-center justify-center">
+            <Table2 class="w-6 h-6 stat-icon" />
           </div>
         </div>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/ai-model')">
+      <div class="stat-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/ai-model')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500">AI模型</p>
-            <p class="text-2xl font-bold text-gray-800 mt-1">{{ stats.models }}</p>
+            <p class="text-sm stat-label">AI模型</p>
+            <p class="text-2xl font-bold stat-value mt-1">{{ stats.models }}</p>
           </div>
-          <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-            <Bot class="w-6 h-6 text-purple-600" />
+          <div class="w-12 h-12 stat-icon-bg-purple rounded-full flex items-center justify-center">
+            <Bot class="w-6 h-6 stat-icon-purple" />
           </div>
         </div>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/ai-chat')">
+      <div class="stat-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/ai-chat')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500">对话次数</p>
-            <p class="text-2xl font-bold text-gray-800 mt-1">{{ stats.sessions }}</p>
+            <p class="text-sm stat-label">对话次数</p>
+            <p class="text-2xl font-bold stat-value mt-1">{{ stats.sessions }}</p>
           </div>
-          <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-            <MessageSquare class="w-6 h-6 text-green-600" />
+          <div class="w-12 h-12 stat-icon-bg-green rounded-full flex items-center justify-center">
+            <MessageSquare class="w-6 h-6 stat-icon-green" />
           </div>
         </div>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/token-stats')">
+      <div class="stat-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/token-stats')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500">Token消耗</p>
-            <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatNumber(stats.tokens) }}</p>
+            <p class="text-sm stat-label">Token消耗</p>
+            <p class="text-2xl font-bold stat-value mt-1">{{ formatNumber(stats.tokens) }}</p>
           </div>
-          <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-            <Zap class="w-6 h-6 text-orange-600" />
+          <div class="w-12 h-12 stat-icon-bg-orange rounded-full flex items-center justify-center">
+            <Zap class="w-6 h-6 stat-icon-orange" />
           </div>
         </div>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/token-stats')">
+      <div class="stat-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer" @click="navigateTo('/token-stats')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500">总费用</p>
-            <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCost(stats.cost) }}</p>
+            <p class="text-sm stat-label">总费用</p>
+            <p class="text-2xl font-bold stat-value mt-1">{{ formatCost(stats.cost) }}</p>
           </div>
-          <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-            <DollarSign class="w-6 h-6 text-red-600" />
+          <div class="w-12 h-12 stat-icon-bg-red rounded-full flex items-center justify-center">
+            <DollarSign class="w-6 h-6 stat-icon-red" />
           </div>
         </div>
       </div>
     </div>
 
     <!-- 快捷操作 -->
-    <div class="bg-white rounded-xl shadow-sm p-6">
-      <h3 class="font-semibold text-gray-800 mb-4">快捷操作</h3>
+    <div class="quick-action-card rounded-xl shadow-sm p-6">
+      <h3 class="font-semibold card-title mb-4">快捷操作</h3>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <button
           v-for="action in quickActions"
           :key="action.path"
-          class="flex items-center gap-3 p-4 rounded-xl border border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
+          class="flex items-center gap-3 p-4 rounded-xl quick-action-item transition-all group"
           @click="navigateTo(action.path)"
         >
           <div :class="[action.color, 'w-10 h-10 rounded-lg flex items-center justify-center']">
             <component :is="action.icon" class="w-5 h-5 text-white" />
           </div>
-          <span class="text-sm text-gray-700 group-hover:text-primary">{{ action.label }}</span>
-          <ChevronRight class="w-4 h-4 text-gray-400 ml-auto group-hover:text-primary" />
+          <span class="text-sm quick-action-label group-hover:text-primary">{{ action.label }}</span>
+          <ChevronRight class="w-4 h-4 quick-action-arrow ml-auto group-hover:text-primary" />
         </button>
       </div>
     </div>
@@ -195,74 +195,74 @@ onMounted(() => {
     <!-- 最近数据 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- 最近数据表 -->
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 class="font-semibold text-gray-800">最近数据表</h3>
+      <div class="recent-card rounded-xl shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 card-header">
+          <h3 class="font-semibold card-title">最近数据表</h3>
           <button class="text-sm text-primary hover:underline" @click="navigateTo('/table-manage')">
             查看全部
           </button>
         </div>
-        <div v-if="recentTables.length === 0" class="p-6 text-center text-gray-400">
+        <div v-if="recentTables.length === 0" class="p-6 text-center empty-text">
           暂无数据表
         </div>
-        <div v-else class="divide-y divide-gray-100">
+        <div v-else class="divide-y card-divider">
           <div
             v-for="table in recentTables"
             :key="table.tableId"
-            class="flex items-center justify-between px-6 py-3 hover:bg-gray-50 cursor-pointer"
+            class="flex items-center justify-between px-6 py-3 list-item cursor-pointer"
             @click="navigateTo(`/data-manage/${table.tableId}`)"
           >
             <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Table2 class="w-4 h-4 text-blue-600" />
+              <div class="w-8 h-8 item-icon-bg rounded-lg flex items-center justify-center">
+                <Table2 class="w-4 h-4 item-icon" />
               </div>
               <div>
-                <p class="text-sm text-gray-800">{{ table.displayName }}</p>
-                <p class="text-xs text-gray-400">{{ table.tableName }}</p>
+                <p class="text-sm item-title">{{ table.displayName }}</p>
+                <p class="text-xs item-desc">{{ table.tableName }}</p>
               </div>
             </div>
-            <ChevronRight class="w-4 h-4 text-gray-400" />
+            <ChevronRight class="w-4 h-4 item-arrow" />
           </div>
         </div>
       </div>
 
       <!-- AI模型列表 -->
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 class="font-semibold text-gray-800">AI模型</h3>
+      <div class="recent-card rounded-xl shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 card-header">
+          <h3 class="font-semibold card-title">AI模型</h3>
           <button class="text-sm text-primary hover:underline" @click="navigateTo('/ai-model')">
             查看全部
           </button>
         </div>
-        <div v-if="recentModels.length === 0" class="p-6 text-center text-gray-400">
+        <div v-if="recentModels.length === 0" class="p-6 text-center empty-text">
           暂无AI模型
         </div>
-        <div v-else class="divide-y divide-gray-100">
+        <div v-else class="divide-y card-divider">
           <div
             v-for="model in recentModels"
             :key="model.modelId"
-            class="flex items-center justify-between px-6 py-3 hover:bg-gray-50 cursor-pointer"
+            class="flex items-center justify-between px-6 py-3 list-item cursor-pointer"
             @click="navigateTo('/ai-model')"
           >
             <div class="flex items-center gap-3">
-              <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Bot class="w-4 h-4 text-purple-600" />
+              <div class="w-8 h-8 item-icon-bg-purple rounded-lg flex items-center justify-center">
+                <Bot class="w-4 h-4 item-icon-purple" />
               </div>
               <div>
-                <p class="text-sm text-gray-800">{{ model.modelName }}</p>
-                <p class="text-xs text-gray-400">{{ model.modelIdentifier }}</p>
+                <p class="text-sm item-title">{{ model.modelName }}</p>
+                <p class="text-xs item-desc">{{ model.modelIdentifier }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2">
               <span
                 v-if="model.isDefault"
-                class="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full"
+                class="px-2 py-0.5 text-xs default-tag rounded-full"
               >
                 默认
               </span>
               <span
                 class="px-2 py-0.5 text-xs rounded-full"
-                :class="model.isEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'"
+                :class="model.isEnabled ? 'enabled-tag' : 'disabled-tag'"
               >
                 {{ model.isEnabled ? '启用' : '禁用' }}
               </span>
@@ -273,3 +273,154 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.dashboard-page {
+  background-color: var(--color-bg-layout);
+}
+
+.welcome-banner {
+  background: linear-gradient(to right, var(--color-primary), var(--color-primary-dark));
+}
+
+.stat-card {
+  background-color: var(--color-bg-container);
+}
+
+.stat-label {
+  color: var(--color-text-secondary);
+}
+
+.stat-value {
+  color: var(--color-text-primary);
+}
+
+.stat-icon-bg {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.stat-icon {
+  color: #3b82f6;
+}
+
+.stat-icon-bg-purple {
+  background-color: rgba(168, 85, 247, 0.1);
+}
+
+.stat-icon-purple {
+  color: #a855f7;
+}
+
+.stat-icon-bg-green {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.stat-icon-green {
+  color: #22c55e;
+}
+
+.stat-icon-bg-orange {
+  background-color: rgba(249, 115, 22, 0.1);
+}
+
+.stat-icon-orange {
+  color: #f97316;
+}
+
+.stat-icon-bg-red {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.stat-icon-red {
+  color: #ef4444;
+}
+
+.quick-action-card {
+  background-color: var(--color-bg-container);
+}
+
+.card-title {
+  color: var(--color-text-primary);
+}
+
+.quick-action-item {
+  border: 1px solid var(--color-border);
+}
+
+.quick-action-item:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-bg);
+}
+
+.quick-action-label {
+  color: var(--color-text-secondary);
+}
+
+.quick-action-arrow {
+  color: var(--color-text-placeholder);
+}
+
+.recent-card {
+  background-color: var(--color-bg-container);
+}
+
+.card-header {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.empty-text {
+  color: var(--color-text-placeholder);
+}
+
+.card-divider {
+  border-color: var(--color-border);
+}
+
+.list-item:hover {
+  background-color: var(--color-bg-active);
+}
+
+.item-icon-bg {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.item-icon {
+  color: #3b82f6;
+}
+
+.item-icon-bg-purple {
+  background-color: rgba(168, 85, 247, 0.1);
+}
+
+.item-icon-purple {
+  color: #a855f7;
+}
+
+.item-title {
+  color: var(--color-text-primary);
+}
+
+.item-desc {
+  color: var(--color-text-placeholder);
+}
+
+.item-arrow {
+  color: var(--color-text-placeholder);
+}
+
+.default-tag {
+  background-color: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.enabled-tag {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.disabled-tag {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-placeholder);
+}
+</style>

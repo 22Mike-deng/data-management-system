@@ -538,8 +538,8 @@ onUnmounted(() => {
 <template>
   <div class="h-[calc(100vh-8rem)] flex animate-fadeIn">
     <!-- 左侧会话列表 -->
-    <div class="w-64 bg-white rounded-l-xl shadow-sm border-r border-gray-100 flex flex-col">
-      <div class="p-4 border-b border-gray-100">
+    <div class="chat-sidebar w-64 rounded-l-xl shadow-sm flex flex-col">
+      <div class="p-4 border-b border-gray-100 dark:border-gray-700">
         <button
           class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           @click="newSession"
@@ -549,7 +549,7 @@ onUnmounted(() => {
         </button>
       </div>
       <div class="flex-1 overflow-auto p-2">
-        <div v-if="sessions.length === 0" class="text-center text-gray-400 text-sm py-8">
+        <div v-if="sessions.length === 0" class="text-center text-sm py-8 session-empty">
           暂无历史会话
         </div>
         <div v-else class="space-y-1">
@@ -557,16 +557,16 @@ onUnmounted(() => {
             v-for="session in sessions"
             :key="session.sessionId"
             class="group p-3 rounded-lg cursor-pointer transition-colors"
-            :class="session.sessionId === currentSessionId ? 'bg-primary/10' : 'hover:bg-gray-50'"
+            :class="session.sessionId === currentSessionId ? 'session-active' : 'session-item'"
             @click="loadSessionMessages(session)"
           >
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-gray-800 truncate">{{ session.lastMessage || '新会话' }}</p>
-                <p class="text-xs text-gray-400 mt-1">{{ session.modelName }}</p>
+                <p class="text-sm truncate session-title">{{ session.lastMessage || '新会话' }}</p>
+                <p class="text-xs mt-1 session-model">{{ session.modelName }}</p>
               </div>
               <button
-                class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all"
+                class="opacity-0 group-hover:opacity-100 p-1 transition-all delete-btn"
                 @click.stop="handleDeleteSession(session)"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -578,9 +578,9 @@ onUnmounted(() => {
     </div>
 
     <!-- 右侧对话区域 -->
-    <div class="flex-1 flex flex-col bg-white rounded-r-xl shadow-sm">
+    <div class="chat-main flex-1 flex flex-col rounded-r-xl shadow-sm">
       <!-- 顶部工具栏 -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div class="flex items-center justify-between px-6 py-4 border-b chat-border">
         <div class="flex items-center gap-4">
           <select
             v-model="selectedModel"
@@ -655,10 +655,10 @@ onUnmounted(() => {
               <div
                 v-for="(tool, ti) in msg.toolCalls"
                 :key="ti"
-                class="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs"
+                class="px-3 py-2 border rounded-lg text-xs tool-call"
               >
                 <div class="flex items-center gap-2">
-                  <span class="font-medium text-blue-700">{{ getToolDisplayName(tool.name) }}</span>
+                  <span class="font-medium tool-name">{{ getToolDisplayName(tool.name) }}</span>
                   <span :class="tool.success ? 'text-green-600' : 'text-red-600'">
                     {{ tool.success ? '✓ 成功' : '✗ 失败' }}
                   </span>
@@ -668,7 +668,7 @@ onUnmounted(() => {
             <!-- 思考步骤显示 -->
             <div v-if="msg.thinking" class="mb-2">
               <button
-                class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700 hover:bg-purple-100 transition-colors w-full"
+                class="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs transition-colors w-full thinking-btn"
                 @click="toggleThinking(index)"
               >
                 <Brain class="w-3.5 h-3.5" />
@@ -678,14 +678,14 @@ onUnmounted(() => {
               </button>
               <div
                 v-if="expandedThinking.has(index)"
-                class="mt-1 px-3 py-2 bg-purple-50/50 border border-purple-100 rounded-lg text-xs text-gray-600 whitespace-pre-wrap"
+                class="mt-1 px-3 py-2 border rounded-lg text-xs whitespace-pre-wrap thinking-content"
               >
                 {{ msg.thinking }}
               </div>
             </div>
             <div
               class="px-4 py-3 rounded-2xl"
-              :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'"
+              :class="msg.role === 'user' ? 'bg-primary text-white' : 'message-bubble'"
             >
               <p class="text-sm whitespace-pre-wrap">{{ msg.content }}</p>
             </div>
@@ -694,7 +694,7 @@ onUnmounted(() => {
                 {{ formatTime(msg.createdAt) }}
               </p>
               <button
-                class="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                class="p-1 transition-colors copy-btn"
                 title="复制内容"
                 @click="handleCopyMessage(msg.content, index)"
               >
@@ -714,7 +714,7 @@ onUnmounted(() => {
           <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
             <Bot class="w-4 h-4 text-primary" />
           </div>
-          <div class="px-4 py-3 bg-gray-100 rounded-2xl">
+          <div class="px-4 py-3 rounded-2xl message-bubble">
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
               <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
@@ -725,7 +725,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 输入区域 -->
-      <div class="p-4 border-t border-gray-100 relative">
+      <div class="p-4 border-t chat-border relative">
         <div class="flex items-end gap-3">
           <div class="flex-1 relative">
             <textarea
@@ -800,3 +800,153 @@ onUnmounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.chat-sidebar {
+  background-color: var(--color-bg-container);
+  border-right: 1px solid var(--color-border);
+}
+
+.chat-main {
+  background-color: var(--color-bg-container);
+}
+
+.chat-border {
+  border-color: var(--color-border);
+}
+
+.model-select {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.clear-btn {
+  color: var(--color-text-placeholder);
+}
+
+.clear-btn:hover {
+  color: var(--color-error);
+}
+
+.message-container {
+  background-color: var(--color-bg-layout);
+}
+
+.empty-message {
+  color: var(--color-text-placeholder);
+}
+
+.session-empty {
+  color: var(--color-text-placeholder);
+}
+
+.session-item {
+  background-color: transparent;
+}
+
+.session-item:hover {
+  background-color: var(--color-bg-active);
+}
+
+.session-active {
+  background-color: var(--color-primary-bg);
+}
+
+.session-title {
+  color: var(--color-text-primary);
+}
+
+.session-model {
+  color: var(--color-text-placeholder);
+}
+
+.delete-btn {
+  color: var(--color-text-placeholder);
+}
+
+.delete-btn:hover {
+  color: var(--color-error);
+}
+
+.tool-call {
+  background-color: var(--color-primary-bg);
+  border-color: var(--color-primary-border);
+}
+
+.tool-name {
+  color: var(--color-primary);
+}
+
+.thinking-btn {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.thinking-btn:hover {
+  background-color: var(--color-bg-active);
+}
+
+.thinking-content {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.message-bubble {
+  background-color: var(--color-bg-container);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.copy-btn {
+  color: var(--color-text-placeholder);
+}
+
+.copy-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+.input-area {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.input-hint {
+  color: var(--color-text-placeholder);
+}
+
+.mention-dropdown {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+}
+
+.mention-dropdown-header {
+  color: var(--color-text-placeholder);
+  border-color: var(--color-border);
+}
+
+.mention-item {
+  background-color: transparent;
+}
+
+.mention-item:hover {
+  background-color: var(--color-bg-active);
+}
+
+.mention-item-active {
+  background-color: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.mention-icon {
+  color: var(--color-text-placeholder);
+}
+
+.mention-desc {
+  color: var(--color-text-placeholder);
+}
+</style>

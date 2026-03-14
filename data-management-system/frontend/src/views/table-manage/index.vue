@@ -508,15 +508,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn">
+  <div class="space-y-6 animate-fadeIn table-manage-page">
     <!-- 操作栏 -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">数据表管理</h2>
-        <p class="text-sm text-gray-500 mt-1">创建和管理您的数据表结构</p>
+        <h2 class="text-xl font-semibold page-title">数据表管理</h2>
+        <p class="text-sm page-desc mt-1">创建和管理您的数据表结构</p>
       </div>
       <button
-        class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+        class="flex items-center gap-2 px-4 py-2 primary-btn text-white rounded-lg transition-colors"
         @click="handleCreate"
       >
         <Plus class="w-4 h-4" />
@@ -525,63 +525,63 @@ onMounted(() => {
     </div>
 
     <!-- 表格区域 -->
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div v-if="loading" class="p-8 text-center text-gray-500">
+    <div class="table-container rounded-xl shadow-sm overflow-hidden">
+      <div v-if="loading" class="p-8 text-center loading-text">
         加载中...
       </div>
-      <div v-else-if="tableList.length === 0" class="p-8 text-center">
-        <div class="text-gray-400 mb-4">
+      <div v-else-if="tableList.length === 0" class="p-8 text-center empty-container">
+        <div class="empty-icon mb-4">
           <Eye class="w-12 h-12 mx-auto" />
         </div>
-        <p class="text-gray-500 mb-4">暂无数据表</p>
+        <p class="empty-text mb-4">暂无数据表</p>
         <button
-          class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          class="px-4 py-2 primary-btn text-white rounded-lg transition-colors"
           @click="handleCreate"
         >
           创建第一个数据表
         </button>
       </div>
       <table v-else class="w-full">
-        <thead class="bg-gray-50 border-b border-gray-100">
+        <thead class="table-header">
           <tr>
-            <th class="text-left px-6 py-4 text-sm font-medium text-gray-600">表名称</th>
-            <th class="text-left px-6 py-4 text-sm font-medium text-gray-600">显示名称</th>
-            <th class="text-left px-6 py-4 text-sm font-medium text-gray-600">描述</th>
-            <th class="text-left px-6 py-4 text-sm font-medium text-gray-600">创建时间</th>
-            <th class="text-right px-6 py-4 text-sm font-medium text-gray-600">操作</th>
+            <th class="text-left px-6 py-4 text-sm font-medium th-text">表名称</th>
+            <th class="text-left px-6 py-4 text-sm font-medium th-text">显示名称</th>
+            <th class="text-left px-6 py-4 text-sm font-medium th-text">描述</th>
+            <th class="text-left px-6 py-4 text-sm font-medium th-text">创建时间</th>
+            <th class="text-right px-6 py-4 text-sm font-medium th-text">操作</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="table in tableList" :key="table.tableId" class="hover:bg-gray-50">
-            <td class="px-6 py-4 text-sm text-gray-800 font-mono">{{ table.tableName }}</td>
-            <td class="px-6 py-4 text-sm text-gray-600">{{ table.displayName }}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">{{ table.description || '-' }}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">{{ formatDate(table.createdAt) }}</td>
+        <tbody class="divide-y table-divider">
+          <tr v-for="table in tableList" :key="table.tableId" class="table-row">
+            <td class="px-6 py-4 text-sm td-primary font-mono">{{ table.tableName }}</td>
+            <td class="px-6 py-4 text-sm td-secondary">{{ table.displayName }}</td>
+            <td class="px-6 py-4 text-sm td-placeholder">{{ table.description || '-' }}</td>
+            <td class="px-6 py-4 text-sm td-placeholder">{{ formatDate(table.createdAt) }}</td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-2">
                 <button
-                  class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+                  class="p-2 action-btn rounded-lg transition-colors"
                   title="查看数据"
                   @click="handleViewData(table)"
                 >
                   <Eye class="w-4 h-4" />
                 </button>
                 <button
-                  class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+                  class="p-2 action-btn rounded-lg transition-colors"
                   title="管理字段"
                   @click="handleManageFields(table)"
                 >
                   <Settings class="w-4 h-4" />
                 </button>
                 <button
-                  class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+                  class="p-2 action-btn rounded-lg transition-colors"
                   title="编辑"
                   @click="handleEdit(table)"
                 >
                   <Edit class="w-4 h-4" />
                 </button>
                 <button
-                  class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  class="p-2 delete-btn rounded-lg transition-colors"
                   title="删除"
                   @click="handleDelete(table)"
                 >
@@ -598,7 +598,7 @@ onMounted(() => {
     <Modal v-model:visible="showTableModal" :title="modalMode === 'create' ? '新建数据表' : '编辑数据表'">
       <div class="p-6 space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium form-label mb-1">
             表名称 <span class="text-red-500">*</span>
           </label>
           <input
@@ -606,41 +606,41 @@ onMounted(() => {
             type="text"
             placeholder="例如: user_info"
             :disabled="modalMode === 'edit'"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-50"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
           />
-          <p class="text-xs text-gray-400 mt-1">使用英文、数字和下划线，创建后不可修改</p>
+          <p class="text-xs form-hint mt-1">使用英文、数字和下划线，创建后不可修改</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium form-label mb-1">
             显示名称 <span class="text-red-500">*</span>
           </label>
           <input
             v-model="tableForm.displayName"
             type="text"
             placeholder="例如: 用户信息"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+          <label class="block text-sm font-medium form-label mb-1">描述</label>
           <textarea
             v-model="tableForm.description"
             rows="3"
             placeholder="请输入数据表描述"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
           ></textarea>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
           <button
-            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            class="px-4 py-2 cancel-btn rounded-lg transition-colors"
             @click="showTableModal = false"
           >
             取消
           </button>
           <button
-            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            class="px-4 py-2 primary-btn text-white rounded-lg transition-colors disabled:opacity-50"
             :disabled="saveTableLoading"
             @click="handleSaveTable"
           >
@@ -654,17 +654,17 @@ onMounted(() => {
     <Modal v-model:visible="showFieldModal" :title="`字段管理 - ${currentTable?.displayName}`" width="800px">
       <div class="p-6">
         <!-- 添加字段表单 -->
-        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+        <div class="field-form-bg rounded-lg p-4 mb-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-medium text-gray-700">
+            <h4 class="text-sm font-medium form-label">
               {{ fieldMode === 'create' ? '添加新字段' : '编辑字段' }}
-              <span v-if="currentFieldType" class="text-xs text-gray-400 ml-2">
+              <span v-if="currentFieldType" class="text-xs form-hint ml-2">
                 ({{ currentFieldType.dbType }})
               </span>
             </h4>
             <div v-if="fieldMode === 'edit'" class="flex gap-2">
               <button
-                class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                class="px-3 py-1 text-sm cancel-text-btn"
                 @click="handleAddField"
               >
                 取消编辑
@@ -675,29 +675,29 @@ onMounted(() => {
           <!-- 基础属性 -->
           <div class="grid grid-cols-3 gap-3 mb-3">
             <div>
-              <label class="block text-xs text-gray-500 mb-1">字段名 <span class="text-red-500">*</span></label>
+              <label class="block text-xs form-hint mb-1">字段名 <span class="text-red-500">*</span></label>
               <input
                 v-model="fieldForm.fieldName"
                 type="text"
                 placeholder="例如: user_name"
                 :disabled="fieldMode === 'edit'"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">显示名称 <span class="text-red-500">*</span></label>
+              <label class="block text-xs form-hint mb-1">显示名称 <span class="text-red-500">*</span></label>
               <input
                 v-model="fieldForm.displayName"
                 type="text"
                 placeholder="例如: 用户名"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">字段类型</label>
+              <label class="block text-xs form-hint mb-1">字段类型</label>
               <select
                 v-model="fieldForm.fieldType"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option v-for="opt in FIELD_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -710,44 +710,44 @@ onMounted(() => {
           <div class="grid grid-cols-4 gap-3 mb-3">
             <!-- 长度 -->
             <div v-if="showLengthSetting">
-              <label class="block text-xs text-gray-500 mb-1">长度</label>
+              <label class="block text-xs form-hint mb-1">长度</label>
               <input
                 v-model.number="fieldForm.length"
                 type="number"
                 min="1"
                 placeholder="长度"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <!-- 小数位数 -->
             <div v-if="showDecimalSetting">
-              <label class="block text-xs text-gray-500 mb-1">小数位</label>
+              <label class="block text-xs form-hint mb-1">小数位</label>
               <input
                 v-model.number="fieldForm.decimalPlaces"
                 type="number"
                 min="0"
                 max="30"
                 placeholder="小数位"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <!-- 默认值 -->
             <div>
-              <label class="block text-xs text-gray-500 mb-1">默认值</label>
+              <label class="block text-xs form-hint mb-1">默认值</label>
               <input
                 v-model="fieldForm.defaultValue"
                 type="text"
                 placeholder="可选"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <!-- 必填 -->
             <div class="flex items-end">
-              <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs form-hint cursor-pointer">
                 <input
                   v-model="fieldForm.required"
                   type="checkbox"
-                  class="rounded border-gray-300 text-primary focus:ring-primary"
+                  class="rounded text-primary focus:ring-primary"
                 />
                 必填字段
               </label>
@@ -756,22 +756,22 @@ onMounted(() => {
 
           <!-- 选项配置 -->
           <div v-if="showOptionsSetting" class="mb-3">
-            <label class="block text-xs text-gray-500 mb-1">选项配置 (JSON格式)</label>
+            <label class="block text-xs form-hint mb-1">选项配置 (JSON格式)</label>
             <input
               v-model="fieldForm.options"
               type="text"
               placeholder='[{"label":"选项1","value":"1"},{"label":"选项2","value":"2"}]'
-              class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
 
           <!-- 关联表设置 -->
           <div v-if="showRelationSetting" class="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label class="block text-xs text-gray-500 mb-1">关联表</label>
+              <label class="block text-xs form-hint mb-1">关联表</label>
               <select
                 v-model="fieldForm.relationTable"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">请选择</option>
                 <option v-for="table in tableList" :key="table.tableId" :value="table.tableName">
@@ -782,9 +782,9 @@ onMounted(() => {
           </div>
 
           <!-- 高级选项 -->
-          <div class="border-t border-gray-200 pt-3 mt-3">
+          <div class="border-t form-divider pt-3 mt-3">
             <button
-              class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              class="flex items-center gap-1 text-xs advanced-btn"
               @click="showAdvancedOptions = !showAdvancedOptions"
             >
               <ChevronDown v-if="!showAdvancedOptions" class="w-3 h-3" />
@@ -795,52 +795,52 @@ onMounted(() => {
             <div v-if="showAdvancedOptions" class="mt-3 space-y-3">
               <!-- 约束选项 -->
               <div class="grid grid-cols-4 gap-3">
-                <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <label class="flex items-center gap-2 text-xs form-hint cursor-pointer">
                   <input
                     v-model="fieldForm.isIndex"
                     type="checkbox"
-                    class="rounded border-gray-300 text-primary focus:ring-primary"
+                    class="rounded text-primary focus:ring-primary"
                   />
                   建立索引
                 </label>
-                <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <label class="flex items-center gap-2 text-xs form-hint cursor-pointer">
                   <input
                     v-model="fieldForm.isUnique"
                     type="checkbox"
-                    class="rounded border-gray-300 text-primary focus:ring-primary"
+                    class="rounded text-primary focus:ring-primary"
                   />
                   唯一约束
                 </label>
-                <label v-if="showAutoIncrement" class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <label v-if="showAutoIncrement" class="flex items-center gap-2 text-xs form-hint cursor-pointer">
                   <input
                     v-model="fieldForm.isAutoIncrement"
                     type="checkbox"
-                    class="rounded border-gray-300 text-primary focus:ring-primary"
+                    class="rounded text-primary focus:ring-primary"
                   />
                   自增
                 </label>
-                <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <label class="flex items-center gap-2 text-xs form-hint cursor-pointer">
                   <input
                     v-model="fieldForm.isForeignKey"
                     type="checkbox"
-                    class="rounded border-gray-300 text-primary focus:ring-primary"
+                    class="rounded text-primary focus:ring-primary"
                   />
                   外键约束
                 </label>
               </div>
 
               <!-- 外键设置 -->
-              <div v-if="fieldForm.isForeignKey" class="bg-white p-3 rounded border border-gray-200">
-                <div class="text-xs text-gray-500 mb-2 flex items-center gap-1">
+              <div v-if="fieldForm.isForeignKey" class="foreign-key-card p-3 rounded border">
+                <div class="text-xs form-hint mb-2 flex items-center gap-1">
                   <Info class="w-3 h-3" />
                   外键关联设置
                 </div>
                 <div class="grid grid-cols-3 gap-3">
                   <div>
-                    <label class="block text-xs text-gray-400 mb-1">关联表</label>
+                    <label class="block text-xs form-hint mb-1">关联表</label>
                     <select
                       v-model="fieldForm.foreignKeyTable"
-                      class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option value="">请选择</option>
                       <option v-for="table in tableList" :key="table.tableId" :value="table.tableName">
@@ -849,11 +849,11 @@ onMounted(() => {
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs text-gray-400 mb-1">关联字段</label>
+                    <label class="block text-xs form-hint mb-1">关联字段</label>
                     <select
                       v-model="fieldForm.foreignKeyField"
                       :disabled="!fieldForm.foreignKeyTable"
-                      class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">{{ loadingForeignKeyFields ? '加载中...' : '请先选择关联表' }}</option>
                       <option v-for="field in foreignKeyTableFields" :key="field.fieldId" :value="field.fieldName">
@@ -862,10 +862,10 @@ onMounted(() => {
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs text-gray-400 mb-1">删除行为</label>
+                    <label class="block text-xs form-hint mb-1">删除行为</label>
                     <select
                       v-model="fieldForm.foreignKeyOnDelete"
-                      class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option v-for="opt in FOREIGN_KEY_ON_DELETE_OPTIONS" :key="opt.value" :value="opt.value">
                         {{ opt.label }}
@@ -877,12 +877,12 @@ onMounted(() => {
 
               <!-- 字段注释 -->
               <div>
-                <label class="block text-xs text-gray-500 mb-1">字段注释</label>
+                <label class="block text-xs form-hint mb-1">字段注释</label>
                 <input
                   v-model="fieldForm.comment"
                   type="text"
                   placeholder="字段的业务含义说明"
-                  class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             </div>
@@ -891,7 +891,7 @@ onMounted(() => {
           <!-- 保存按钮 -->
           <div class="flex justify-end mt-3">
             <button
-              class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              class="px-4 py-2 text-sm primary-btn text-white rounded-lg transition-colors disabled:opacity-50"
               :disabled="saveFieldLoading"
               @click="handleSaveField"
             >
@@ -901,55 +901,55 @@ onMounted(() => {
         </div>
 
         <!-- 字段列表 -->
-        <div class="border border-gray-200 rounded-lg overflow-hidden">
-          <div v-if="currentFields.length === 0" class="p-4 text-center text-gray-400 text-sm">
+        <div class="border field-list-border rounded-lg overflow-hidden">
+          <div v-if="currentFields.length === 0" class="p-4 text-center empty-text text-sm">
             暂无字段，请添加
           </div>
           <table v-else class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="table-header">
               <tr>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">字段名</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">显示名称</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">类型</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">长度</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">约束</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500">必填</th>
-                <th class="text-right px-4 py-2 text-xs font-medium text-gray-500">操作</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">字段名</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">显示名称</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">类型</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">长度</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">约束</th>
+                <th class="text-left px-4 py-2 text-xs font-medium th-text">必填</th>
+                <th class="text-right px-4 py-2 text-xs font-medium th-text">操作</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
-              <tr v-for="field in currentFields" :key="field.fieldId" class="hover:bg-gray-50">
-                <td class="px-4 py-2 text-sm font-mono text-gray-800">{{ field.fieldName }}</td>
-                <td class="px-4 py-2 text-sm text-gray-600">{{ field.displayName }}</td>
+            <tbody class="divide-y table-divider">
+              <tr v-for="field in currentFields" :key="field.fieldId" class="table-row">
+                <td class="px-4 py-2 text-sm font-mono td-primary">{{ field.fieldName }}</td>
+                <td class="px-4 py-2 text-sm td-secondary">{{ field.displayName }}</td>
                 <td class="px-4 py-2">
-                  <span class="text-sm text-gray-500">{{ getFieldTypeName(field.fieldType) }}</span>
+                  <span class="text-sm td-placeholder">{{ getFieldTypeName(field.fieldType) }}</span>
                 </td>
-                <td class="px-4 py-2 text-sm text-gray-500">
+                <td class="px-4 py-2 text-sm td-placeholder">
                   <span v-if="field.length">{{ field.length }}<span v-if="field.decimalPlaces">,{{ field.decimalPlaces }}</span></span>
                   <span v-else>-</span>
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex flex-wrap gap-1">
-                    <span v-if="field.isIndex" class="px-1.5 py-0.5 text-xs bg-blue-50 text-blue-600 rounded">索引</span>
-                    <span v-if="field.isUnique" class="px-1.5 py-0.5 text-xs bg-purple-50 text-purple-600 rounded">唯一</span>
-                    <span v-if="field.isAutoIncrement" class="px-1.5 py-0.5 text-xs bg-green-50 text-green-600 rounded">自增</span>
-                    <span v-if="field.isForeignKey" class="px-1.5 py-0.5 text-xs bg-orange-50 text-orange-600 rounded">外键</span>
+                    <span v-if="field.isIndex" class="px-1.5 py-0.5 text-xs index-tag rounded">索引</span>
+                    <span v-if="field.isUnique" class="px-1.5 py-0.5 text-xs unique-tag rounded">唯一</span>
+                    <span v-if="field.isAutoIncrement" class="px-1.5 py-0.5 text-xs auto-tag rounded">自增</span>
+                    <span v-if="field.isForeignKey" class="px-1.5 py-0.5 text-xs foreign-tag rounded">外键</span>
                   </div>
                 </td>
                 <td class="px-4 py-2 text-sm">
-                  <span :class="field.required ? 'text-red-500' : 'text-gray-400'">
+                  <span :class="field.required ? 'required-text' : 'td-placeholder'">
                     {{ field.required ? '是' : '否' }}
                   </span>
                 </td>
                 <td class="px-4 py-2 text-right">
                   <button
-                    class="p-1 text-gray-400 hover:text-primary"
+                    class="p-1 action-btn"
                     @click="handleEditField(field)"
                   >
                     <Edit class="w-3.5 h-3.5" />
                   </button>
                   <button
-                    class="p-1 text-gray-400 hover:text-red-500"
+                    class="p-1 delete-action-btn"
                     @click="handleDeleteField(field)"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -985,3 +985,181 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.table-manage-page {
+  background-color: var(--color-bg-layout);
+}
+
+.page-title {
+  color: var(--color-text-primary);
+}
+
+.page-desc {
+  color: var(--color-text-secondary);
+}
+
+.primary-btn {
+  background-color: var(--color-primary);
+}
+
+.primary-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.table-container {
+  background-color: var(--color-bg-container);
+}
+
+.loading-text {
+  color: var(--color-text-secondary);
+}
+
+.empty-container {
+  background-color: var(--color-bg-container);
+}
+
+.empty-icon {
+  color: var(--color-text-placeholder);
+}
+
+.empty-text {
+  color: var(--color-text-secondary);
+}
+
+.table-header {
+  background-color: var(--color-bg-active);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.th-text {
+  color: var(--color-text-secondary);
+}
+
+.table-divider {
+  border-color: var(--color-border);
+}
+
+.table-row:hover {
+  background-color: var(--color-bg-active);
+}
+
+.td-primary {
+  color: var(--color-text-primary);
+}
+
+.td-secondary {
+  color: var(--color-text-secondary);
+}
+
+.td-placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.action-btn:hover {
+  color: var(--color-primary);
+  background-color: var(--color-bg-active);
+}
+
+.delete-btn {
+  color: var(--color-text-placeholder);
+}
+
+.delete-btn:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-bg);
+}
+
+.form-label {
+  color: var(--color-text-primary);
+}
+
+.form-input {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.form-hint {
+  color: var(--color-text-placeholder);
+}
+
+.form-divider {
+  border-color: var(--color-border);
+}
+
+.cancel-btn {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-active);
+}
+
+.cancel-btn:hover {
+  background-color: var(--color-border);
+}
+
+.cancel-text-btn {
+  color: var(--color-text-secondary);
+}
+
+.cancel-text-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.field-form-bg {
+  background-color: var(--color-bg-active);
+}
+
+.advanced-btn {
+  color: var(--color-text-placeholder);
+}
+
+.advanced-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+.foreign-key-card {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+}
+
+.field-list-border {
+  border-color: var(--color-border);
+}
+
+.index-tag {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.unique-tag {
+  background-color: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}
+
+.auto-tag {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.foreign-tag {
+  background-color: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+}
+
+.required-text {
+  color: var(--color-error);
+}
+
+.delete-action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.delete-action-btn:hover {
+  color: var(--color-error);
+}
+</style>

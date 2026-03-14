@@ -21,6 +21,8 @@ import { RedisCacheModule } from './modules/redis-cache';
 import { AuthModule } from './modules/auth';
 import { UserModule } from './modules/user';
 import { MailModule } from './modules/mail';
+import { AuditLogModule } from './modules/audit-log';
+import { DataImportExportModule } from './modules/data-import-export';
 
 @Module({
   imports: [
@@ -70,6 +72,17 @@ import { MailModule } from './modules/mail';
         synchronize: configService.get('NODE_ENV') !== 'production',
         // 开发环境：只输出错误和警告；生产环境：关闭所有日志
         logging: configService.get('NODE_ENV') === 'production' ? false : ['error'],
+        // 连接池配置
+        extra: {
+          connectionLimit: configService.get<number>('DB_POOL_SIZE', 10),    // 连接池大小
+          waitForConnections: true,    // 连接池满时等待
+          queueLimit: 0,               // 不限制等待队列
+          connectTimeout: 10000,       // 连接超时10秒
+          acquireTimeout: 30000,       // 获取连接超时30秒
+        },
+        // 连接池健康检查
+        poolSize: configService.get<number>('DB_POOL_SIZE', 10),
+        keepConnectionAlive: true,
       }),
       inject: [ConfigService],
     }),
@@ -83,6 +96,8 @@ import { MailModule } from './modules/mail';
     TokenUsageModule,
     ViewConfigModule,
     KnowledgeBaseModule,
+    AuditLogModule,
+    DataImportExportModule,
   ],
   controllers: [AppController],
   providers: [

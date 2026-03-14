@@ -13,205 +13,14 @@ import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing } from '@/data
 import { AIModelService } from './ai-model.service';
 import { AIToolsService } from './ai-tools.service';
 import { SendMessageDto, GetChatHistoryDto, ThinkingType } from './dto';
-
-// 系统提示词（不带思考标签要求，用于原生支持 thinking 的模型）
-const SYSTEM_PROMPT_SIMPLE = `你是一个数据管理助手，可以帮助用户管理数据库中的数据。你可以使用以下工具：
-
-1. list_tables - 列出所有数据表
-2. describe_table - 查看表结构
-3. query_data - 查询表数据
-4. count_data - 统计数据总数
-5. aggregate_data - 聚合统计（求和、平均、最大、最小）
-6. group_by_field - 按字段分组统计
-7. search_knowledge - 搜索系统知识库
-8. insert_record - 插入新记录
-9. update_record - 更新已有记录
-10. search_field - 智能搜索表和字段（搜索表名/显示名/字段名，返回相关表的完整结构）
-
-## 重要工作流程
-
-### 添加数据流程：
-1. 先调用 describe_table 了解指定表的结构和必填字段
-2. 如果用户提供的字段在表中不存在，立即调用 search_field 搜索关键词
-3. search_field 会返回相关表的完整结构，从中找到包含目标字段的表
-4. 向用户说明情况，确认是否需要在正确的表中操作
-5. 确认后使用 insert_record 插入记录
-
-### 修改数据流程：
-1. 先通过 query_data 查询获取记录ID
-2. 如果用户提供的字段在表中不存在，调用 search_field 查找正确的表
-3. 从返回的表结构中找到包含目标字段的表
-4. 向用户说明情况
-5. 使用 update_record 更新记录
-
-### 字段不存在时的处理：
-当用户提到某个字段（如"年龄"、"age"），但当前表中没有该字段时，必须调用 search_field 工具。该工具会：
-- 搜索匹配的表名和显示名
-- 搜索匹配的字段名和显示名
-- 返回所有相关表的完整字段结构
-你从返回结果中判断哪个表包含用户需要的字段。
-
-当用户询问数据库相关问题时，你应该使用这些工具来获取信息并回答。
-当用户询问业务规则、操作指南、系统说明等问题时，请优先使用search_knowledge工具查询相关知识库。
-回答时请用中文，并且格式化输出数据，使用Markdown表格展示数据列表。
-表名不需要带data_前缀，系统会自动处理。`;
-
-// 系统提示词（带思考标签要求，用于不支持原生 thinking 的模型）
-const SYSTEM_PROMPT = `你是一个数据管理助手，可以帮助用户管理数据库中的数据。你可以使用以下工具：
-
-1. list_tables - 列出所有数据表
-2. describe_table - 查看表结构
-3. query_data - 查询表数据
-4. count_data - 统计数据总数
-5. aggregate_data - 聚合统计（求和、平均、最大、最小）
-6. group_by_field - 按字段分组统计
-7. search_knowledge - 搜索系统知识库
-8. insert_record - 插入新记录
-9. update_record - 更新已有记录
-10. search_field - 智能搜索表和字段（搜索表名/显示名/字段名，返回相关表的完整结构）
-
-## 回复格式要求
-在回答用户问题之前，请先用 <thinking> 标签展示你的思考过程，格式如下：
-<thinking>
-1. 分析用户问题的意图
-2. 确定需要使用的工具（如果有）
-3. 规划查询步骤
-4. 思考如何呈现结果
-</thinking>
-
-**重要：思考结束后，必须给出最终回答！** 不要只输出思考过程，必须在 </thinking> 标签后面给出对用户有用的回复内容。
-
-## 示例
-用户：查询所有用户数据
-<thinking>
-1. 用户想要查看用户表的数据
-2. 需要先确认表名，可能是 "user" 或 "users"
-3. 使用 list_tables 工具列出所有表，找到用户表
-4. 然后使用 query_data 工具查询数据
-</thinking>
-
-[调用工具获取数据后，最终回答]
-
-## 重要工作流程
-
-### 添加数据流程：
-1. 先调用 describe_table 了解指定表的结构和必填字段
-2. 如果用户提供的字段在表中不存在，立即调用 search_field 搜索关键词
-3. search_field 会返回相关表的完整结构，从中找到包含目标字段的表
-4. 向用户说明情况，确认是否需要在正确的表中操作
-5. 确认后使用 insert_record 插入记录
-
-### 修改数据流程：
-1. 先通过 query_data 查询获取记录ID
-2. 如果用户提供的字段在表中不存在，调用 search_field 查找正确的表
-3. 从返回的表结构中找到包含目标字段的表
-4. 向用户说明情况
-5. 使用 update_record 更新记录
-
-### 字段不存在时的处理：
-当用户提到某个字段（如"年龄"、"age"），但当前表中没有该字段时，必须调用 search_field 工具。该工具会：
-- 搜索匹配的表名和显示名
-- 搜索匹配的字段名和显示名
-- 返回所有相关表的完整字段结构
-你从返回结果中判断哪个表包含用户需要的字段。
-
-当用户询问数据库相关问题时，你应该使用这些工具来获取信息并回答。
-当用户询问业务规则、操作指南、系统说明等问题时，请优先使用search_knowledge工具查询相关知识库。
-回答时请用中文，并且格式化输出数据，使用Markdown表格展示数据列表。
-表名不需要带data_前缀，系统会自动处理。`;
-
-// 知识库增强的系统提示词（带思考标签）
-const SYSTEM_PROMPT_WITH_KNOWLEDGE = `你是一个数据管理助手，可以帮助用户管理数据库中的数据。你还可以查询系统知识库来回答用户问题。你可以使用以下工具：
-
-1. list_tables - 列出所有数据表
-2. describe_table - 查看表结构
-3. query_data - 查询表数据
-4. count_data - 统计数据总数
-5. aggregate_data - 聚合统计（求和、平均、最大、最小）
-6. group_by_field - 按字段分组统计
-7. search_knowledge - 搜索系统知识库（重要：此工具已开启，请在回答问题时优先查询知识库）
-8. insert_record - 插入新记录
-9. update_record - 更新已有记录
-10. search_field - 智能搜索表和字段（搜索表名/显示名/字段名，返回相关表的完整结构）
-
-## 回复格式要求
-在回答用户问题之前，请先用 <thinking> 标签展示你的思考过程，格式如下：
-<thinking>
-1. 分析用户问题的意图
-2. 确定需要使用的工具（如果有）
-3. 规划查询步骤
-4. 思考如何呈现结果
-</thinking>
-
-**重要：思考结束后，必须给出最终回答！** 不要只输出思考过程，必须在 </thinking> 标签后面给出对用户有用的回复内容。
-
-## 重要工作流程
-
-### 添加数据流程：
-1. 先调用 describe_table 了解指定表的结构和必填字段
-2. 如果用户提供的字段在表中不存在，立即调用 search_field 搜索关键词
-3. search_field 会返回相关表的完整结构，从中找到包含目标字段的表
-4. 向用户说明情况，确认是否需要在正确的表中操作
-5. 确认后使用 insert_record 插入记录
-
-### 修改数据流程：
-1. 先通过 query_data 查询获取记录ID
-2. 如果用户提供的字段在表中不存在，调用 search_field 查找正确的表
-3. 从返回的表结构中找到包含目标字段的表
-4. 向用户说明情况
-5. 使用 update_record 更新记录
-
-### 字段不存在时的处理：
-当用户提到某个字段（如"年龄"、"age"），但当前表中没有该字段时，必须调用 search_field 工具。该工具会：
-- 搜索匹配的表名和显示名
-- 搜索匹配的字段名和显示名
-- 返回所有相关表的完整字段结构
-你从返回结果中判断哪个表包含用户需要的字段。
-
-当用户询问任何问题时，请优先使用search_knowledge工具查询相关知识库，然后再根据查询结果回答。
-如果知识库中没有相关信息，再使用数据库工具或你的通用知识回答。
-回答时请用中文，并且格式化输出数据，使用Markdown表格展示数据列表。`;
-
-// 知识库增强的系统提示词（不带思考标签）
-const SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE = `你是一个数据管理助手，可以帮助用户管理数据库中的数据。你还可以查询系统知识库来回答用户问题。你可以使用以下工具：
-
-1. list_tables - 列出所有数据表
-2. describe_table - 查看表结构
-3. query_data - 查询表数据
-4. count_data - 统计数据总数
-5. aggregate_data - 聚合统计（求和、平均、最大、最小）
-6. group_by_field - 按字段分组统计
-7. search_knowledge - 搜索系统知识库（重要：此工具已开启，请在回答问题时优先查询知识库）
-8. insert_record - 插入新记录
-9. update_record - 更新已有记录
-10. search_field - 智能搜索表和字段（搜索表名/显示名/字段名，返回相关表的完整结构）
-
-## 重要工作流程
-
-### 添加数据流程：
-1. 先调用 describe_table 了解指定表的结构和必填字段
-2. 如果用户提供的字段在表中不存在，立即调用 search_field 搜索关键词
-3. search_field 会返回相关表的完整结构，从中找到包含目标字段的表
-4. 向用户说明情况，确认是否需要在正确的表中操作
-5. 确认后使用 insert_record 插入记录
-
-### 修改数据流程：
-1. 先通过 query_data 查询获取记录ID
-2. 如果用户提供的字段在表中不存在，调用 search_field 查找正确的表
-3. 从返回的表结构中找到包含目标字段的表
-4. 向用户说明情况
-5. 使用 update_record 更新记录
-
-### 字段不存在时的处理：
-当用户提到某个字段（如"年龄"、"age"），但当前表中没有该字段时，必须调用 search_field 工具。该工具会：
-- 搜索匹配的表名和显示名
-- 搜索匹配的字段名和显示名
-- 返回所有相关表的完整字段结构
-你从返回结果中判断哪个表包含用户需要的字段。
-
-当用户询问任何问题时，请优先使用search_knowledge工具查询相关知识库，然后再根据查询结果回答。
-如果知识库中没有相关信息，再使用数据库工具或你的通用知识回答。
-回答时请用中文，并且格式化输出数据，使用Markdown表格展示数据列表。`;
+import { getSystemPrompt } from './prompts/system-prompt';
+import { 
+  DEFAULT_AI_PARAMS, 
+  MAX_TOOL_CALL_ROUNDS, 
+  MODEL_MAX_TOKENS_LIMITS,
+  TOKEN_ESTIMATION,
+  TOOL_RESULT_CONFIG 
+} from '@/common/constants/ai.constants';
 
 @Injectable()
 export class AIChatService {
@@ -263,12 +72,10 @@ export class AIChatService {
     // disabled: 关闭思考，使用简单提示词
     // enabled: 开启思考，使用带思考标签的提示词，并发送 thinking 参数
     const enableThinking = dto.thinkingType === 'enabled';
-    let systemPrompt: string;
-    if (dto.useKnowledgeBase) {
-      systemPrompt = enableThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE : SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE;
-    } else {
-      systemPrompt = enableThinking ? SYSTEM_PROMPT : SYSTEM_PROMPT_SIMPLE;
-    }
+    const systemPrompt = getSystemPrompt({
+      useKnowledgeBase: dto.useKnowledgeBase || false,
+      enableThinking,
+    });
 
     // 调用AI模型获取回复（支持工具调用）
     const { reply, thinking: nativeThinking, inputTokens, outputTokens, toolCalls } = await this.callAIModelWithTools(
@@ -459,7 +266,7 @@ export class AIChatService {
     model: AIModelConfig,
     message: string,
     history: { role: string; content: string }[],
-    systemPrompt: string = SYSTEM_PROMPT,
+    systemPrompt: string,
     useKnowledgeBase: boolean = false,
     thinkingType?: ThinkingType,
   ): Promise<{ reply: string; thinking?: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
@@ -504,21 +311,12 @@ export class AIChatService {
     thinkingType?: ThinkingType,
   ): Promise<{ reply: string; thinking?: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     const parameters = model.parameters || {};
-    // 根据模型类型限制 maxTokens，默认8192
-    let maxTokens = parameters.maxTokens ?? 8192;
+    // 根据模型类型限制 maxTokens
+    let maxTokens = parameters.maxTokens ?? DEFAULT_AI_PARAMS.MAX_TOKENS;
     
-    // 不同模型的 max_tokens 实际上限（API硬限制）
-    // custom 类型不做限制，由 API 服务端自行处理
-    const modelMaxLimits: Record<string, number> = {
-      'zhipu': 32768,      // 智谱 API 限制 max_tokens <= 32768
-      'qwen': 32000,       // 通义千问
-      'wenxin': 8000,      // 文心一言
-      'openai': 128000,    // OpenAI GPT-4-turbo/4o 支持 128K
-      'claude': 128000,    // Claude 3 支持高输出
-    };
-    
-    const limit = modelMaxLimits[model.modelType];
-    // 只有已知类型才做限制，custom 类型不做限制，由 API 自己处理
+    // 根据模型类型获取限制
+    const limit = MODEL_MAX_TOKENS_LIMITS[model.modelType];
+    // 只有已知类型才做限制，custom 类型不做限制
     if (limit && maxTokens > limit) {
       maxTokens = limit;
     }
@@ -532,9 +330,9 @@ export class AIChatService {
     const requestBody: any = {
       model: model.modelIdentifier,
       messages,
-      temperature: parameters.temperature ?? 0.7,
+      temperature: parameters.temperature ?? DEFAULT_AI_PARAMS.TEMPERATURE,
       max_tokens: maxTokens,
-      top_p: parameters.topP ?? 1,
+      top_p: parameters.topP ?? DEFAULT_AI_PARAMS.TOP_P,
       tools,
       tool_choice: 'auto',
     };
@@ -545,8 +343,8 @@ export class AIChatService {
       requestBody.thinking = { type: 'enabled' };
     }
 
-    // 最多允许5轮工具调用
-    for (let i = 0; i < 5; i++) {
+    // 最多允许指定轮数的工具调用
+    for (let i = 0; i < MAX_TOOL_CALL_ROUNDS.NORMAL; i++) {
       const response = await fetch(`${model.apiEndpoint}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -625,7 +423,7 @@ export class AIChatService {
     model: AIModelConfig,
     messages: any[],
     tools: any[],
-    systemPrompt: string = SYSTEM_PROMPT,
+    systemPrompt: string,
   ): Promise<{ reply: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     const parameters = model.parameters || {};
     const allToolCalls: any[] = [];
@@ -670,10 +468,10 @@ export class AIChatService {
         },
         body: JSON.stringify({
           model: model.modelIdentifier,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt,
           messages: claudeMessages,
-          max_tokens: parameters.maxTokens ?? 2000,
-          temperature: parameters.temperature ?? 0.7,
+          max_tokens: parameters.maxTokens ?? DEFAULT_AI_PARAMS.MAX_TOKENS,
+          temperature: parameters.temperature ?? DEFAULT_AI_PARAMS.TEMPERATURE,
           tools: claudeTools,
         }),
       });
@@ -734,9 +532,6 @@ export class AIChatService {
   }
 
   /**
-   * 记录Token消耗
-   */
-  /**
    * 记录 Token 使用情况
    * 根据模型定价配置计算实际费用
    */
@@ -747,8 +542,6 @@ export class AIChatService {
     outputTokens: number,
   ): Promise<void> {
     const totalTokens = inputTokens + outputTokens;
-
-    console.log(`[recordTokenUsage] Recording token usage: modelId=${modelId}, sessionId=${sessionId}, input=${inputTokens}, output=${outputTokens}, total=${totalTokens}`);
 
     // 查询模型定价配置（取最新的有效配置）
     const pricing = await this.pricingRepository.findOne({
@@ -764,9 +557,6 @@ export class AIChatService {
       // 输出费用 = (输出 tokens / 1000) * 输出单价
       const outputCost = (outputTokens / 1000) * pricing.outputPrice;
       estimatedCost = inputCost + outputCost;
-      console.log(`[recordTokenUsage] Pricing found: inputPrice=${pricing.inputPrice}, outputPrice=${pricing.outputPrice}, cost=${estimatedCost}`);
-    } else {
-      console.log(`[recordTokenUsage] No pricing found for model ${modelId}`);
     }
 
     const usage = this.tokenUsageRepository.create({
@@ -780,7 +570,6 @@ export class AIChatService {
     });
 
     await this.tokenUsageRepository.save(usage);
-    console.log(`[recordTokenUsage] Token usage saved successfully`);
   }
 
   // ==================== 流式响应方法 ====================
@@ -853,12 +642,10 @@ export class AIChatService {
     // disabled: 关闭思考，使用简单提示词
     // enabled: 开启思考，使用带思考标签的提示词
     const enableThinking = dto.thinkingType === 'enabled';
-    let systemPrompt: string;
-    if (dto.useKnowledgeBase) {
-      systemPrompt = enableThinking ? SYSTEM_PROMPT_WITH_KNOWLEDGE : SYSTEM_PROMPT_WITH_KNOWLEDGE_SIMPLE;
-    } else {
-      systemPrompt = enableThinking ? SYSTEM_PROMPT : SYSTEM_PROMPT_SIMPLE;
-    }
+    const systemPrompt = getSystemPrompt({
+      useKnowledgeBase: dto.useKnowledgeBase || false,
+      enableThinking,
+    });
 
     // 构建消息
     const messages: any[] = [
@@ -877,10 +664,8 @@ export class AIChatService {
     let totalOutputTokens = 0;
     const allToolCalls: any[] = [];
 
-    // 流式调用（最多10轮工具调用）
-    for (let round = 0; round < 10; round++) {
-      console.log(`[Stream] Round ${round + 1} started`);
-      
+    // 流式调用（最多指定轮数的工具调用）
+    for (let round = 0; round < MAX_TOOL_CALL_ROUNDS.STREAM; round++) {
       const result = await this.streamOpenAIRequest(
         model,
         messages,
@@ -895,13 +680,10 @@ export class AIChatService {
         },
       );
 
-      console.log(`[Stream] Round ${round + 1} completed, toolCalls: ${result.toolCalls?.length || 0}`);
-
       // 检查是否有工具调用
       if (result.toolCalls && result.toolCalls.length > 0) {
         // 发送工具调用事件
         for (const toolCall of result.toolCalls) {
-          console.log(`[Stream] Tool call: ${toolCall.name}, success: ${toolCall.success}`);
           subject.next({
             type: 'tool_call',
             data: JSON.stringify({
@@ -923,8 +705,8 @@ export class AIChatService {
         for (const toolCall of result.toolCalls) {
           // 限制工具结果的大小，避免消息过长
           let resultContent = JSON.stringify(toolCall.result);
-          if (resultContent.length > 5000) {
-            resultContent = resultContent.substring(0, 5000) + '... [结果已截断]';
+          if (resultContent.length > TOOL_RESULT_CONFIG.MAX_LENGTH) {
+            resultContent = resultContent.substring(0, TOOL_RESULT_CONFIG.MAX_LENGTH) + TOOL_RESULT_CONFIG.TRUNCATE_SUFFIX;
           }
           messages.push({
             role: 'tool',
@@ -997,17 +779,9 @@ export class AIChatService {
     onChunk: (thinking: string, content: string, inputTokens: number, outputTokens: number) => void,
   ): Promise<{ content: string; toolCalls?: any[]; rawToolCalls?: any[] }> {
     const parameters = model.parameters || {};
-    let maxTokens = parameters.maxTokens ?? 8192;
+    let maxTokens = parameters.maxTokens ?? DEFAULT_AI_PARAMS.MAX_TOKENS;
 
-    const modelMaxLimits: Record<string, number> = {
-      'zhipu': 32768,
-      'qwen': 32000,
-      'wenxin': 8000,
-      'openai': 128000,
-      'claude': 128000,
-    };
-
-    const limit = modelMaxLimits[model.modelType];
+    const limit = MODEL_MAX_TOKENS_LIMITS[model.modelType];
     if (limit && maxTokens > limit) {
       maxTokens = limit;
     }
@@ -1104,8 +878,6 @@ export class AIChatService {
                   outputTokens = totalTokens - inputTokens;
                 }
               }
-              // 调试日志
-              console.log(`[Token Usage] input: ${inputTokens}, output: ${outputTokens}`);
             }
 
             const delta = data.choices?.[0]?.delta;
@@ -1124,11 +896,6 @@ export class AIChatService {
             if (delta.content) {
               thinkingBuffer += delta.content;
 
-              // 调试：显示当前 buffer 内容
-              if (thinkingBuffer.length < 300) {
-                console.log(`[Thinking Debug] Buffer: "${thinkingBuffer.replace(/\n/g, '\\n')}", isInThinking: ${isInThinking}`);
-              }
-
               // 实时处理 thinking 标签（大小写不敏感，允许标签内有空格）
               while (thinkingBuffer.length > 0) {
                 if (isInThinking) {
@@ -1140,7 +907,6 @@ export class AIChatService {
                     const endTagLength = endMatch[0].length;
                     // 找到结束标签，提取思考内容（不含标签）
                     const thinkingContent = thinkingBuffer.substring(0, endIdx);
-                    console.log(`[Thinking] Found end tag, content length: ${thinkingContent.length}`);
                     fullThinking += thinkingContent;
                     subject.next({
                       type: 'thinking',
@@ -1150,7 +916,6 @@ export class AIChatService {
                     // 移除已处理的部分（包括结束标签）
                     thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
                     isInThinking = false;
-                    console.log(`[Thinking] Exited thinking mode, remaining: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}..."`);
 
                     // 过滤掉标签后的空白字符
                     const leadingNewlines = thinkingBuffer.match(/^[\n\r\s]+/);
@@ -1167,11 +932,9 @@ export class AIChatService {
                   if (startMatch) {
                     const startIdx = startMatch.index!;
                     const startTagLength = startMatch[0].length;
-                    console.log(`[Thinking] Found start tag at position: ${startIdx}, tag: "${startMatch[0]}"`);
                     // 找到开始标签，先发送之前的内容
                     if (startIdx > 0) {
                       const content = thinkingBuffer.substring(0, startIdx);
-                      console.log(`[Content] Sending content before thinking: "${content.substring(0, 50)}..."`);
                       fullContent += content;
                       subject.next({
                         type: 'content',
@@ -1182,10 +945,8 @@ export class AIChatService {
                     // 移除开始标签，进入 thinking 模式
                     thinkingBuffer = thinkingBuffer.substring(startIdx + startTagLength);
                     isInThinking = true;
-                    console.log(`[Thinking] Entered thinking mode, remaining buffer: "${thinkingBuffer.substring(0, 30).replace(/\n/g, '\\n')}..."`);
                   } else {
                     // 没有找到开始标签，全部作为正常内容
-                    console.log(`[Content] Sending all buffer as content: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}..."`);
                     fullContent += thinkingBuffer;
                     subject.next({
                       type: 'content',
@@ -1229,16 +990,13 @@ export class AIChatService {
     }
 
     // 处理残留的 buffer（流结束时可能还有未处理的内容）
-    console.log(`[Thinking] Stream ended, buffer length: ${thinkingBuffer.length}, isInThinking: ${isInThinking}`);
     if (thinkingBuffer.length > 0) {
       // 继续处理 thinking 标签（流结束后也需要检测）
       while (thinkingBuffer.length > 0) {
         if (isInThinking) {
-          console.log(`[Thinking] Looking for end tag in: "${thinkingBuffer.substring(0, 100).replace(/\n/g, '\\n')}"`);
           // 在 thinking 内部，查找结束标签（使用正则，允许标签内有空格）
           const endMatch = thinkingBuffer.match(/<\/\s*thinking\s*>/i);
           if (endMatch) {
-            console.log(`[Thinking] Found end tag in final buffer: "${endMatch[0]}"`);
             const endIdx = endMatch.index!;
             const endTagLength = endMatch[0].length;
             const thinkingContent = thinkingBuffer.substring(0, endIdx);
@@ -1249,7 +1007,6 @@ export class AIChatService {
             } as MessageEvent);
             thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
             isInThinking = false;
-            console.log(`[Thinking] Exited thinking mode (final), remaining buffer: "${thinkingBuffer.substring(0, 50).replace(/\n/g, '\\n')}"`);
             // 过滤空白
             const leadingNewlines = thinkingBuffer.match(/^[\n\r\s]+/);
             if (leadingNewlines) {
@@ -1257,7 +1014,6 @@ export class AIChatService {
             }
           } else {
             // 没有结束标签，全部作为思考内容
-            console.log(`[Thinking] No end tag found, treating all as thinking content`);
             fullThinking += thinkingBuffer;
             subject.next({
               type: 'thinking',
@@ -1298,13 +1054,12 @@ export class AIChatService {
     // 如果没有获取到usage信息，尝试估算token数量
     if (inputTokens === 0 && outputTokens === 0) {
       // 简单估算：中文约1.5字符/token，英文约4字符/token
-      // 这里使用保守估算：约2字符/token
+      // 这里使用保守估算
       const totalChars = (fullThinking + fullContent).length;
-      const estimatedTokens = Math.ceil(totalChars / 2);
-      // 输入约占60%，输出约占40%
-      inputTokens = Math.floor(estimatedTokens * 0.6);
+      const estimatedTokens = Math.ceil(totalChars / TOKEN_ESTIMATION.CHARS_PER_TOKEN);
+      // 按配置比例分配
+      inputTokens = Math.floor(estimatedTokens * TOKEN_ESTIMATION.INPUT_RATIO);
       outputTokens = estimatedTokens - inputTokens;
-      console.log(`[Token Estimation] No usage info, estimated - input: ${inputTokens}, output: ${outputTokens}`);
     }
     
     onChunk(fullThinking, fullContent, inputTokens, outputTokens);

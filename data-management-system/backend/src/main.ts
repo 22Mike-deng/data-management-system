@@ -26,10 +26,16 @@ async function bootstrap() {
   // 启用全局异常过滤器
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // 启用CORS
+  // 启用CORS（从环境变量读取允许的域名）
+  const corsOrigins = process.env.CORS_ORIGINS 
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+  
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: corsOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // 设置全局前缀
@@ -46,5 +52,6 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`🚀 后端服务已启动: http://localhost:${port}`);
+  console.log(`📝 CORS已启用，允许的域名: ${corsOrigins.join(', ')}`);
 }
 bootstrap();

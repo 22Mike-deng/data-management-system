@@ -434,4 +434,67 @@ onMounted(() => {
   </div>
 </template>
 
+<style scoped>
+/* 覆盖 Tailwind 硬编码颜色 */
+:deep(.text-gray-800) {
+  color: var(--color-text-primary);
+}
+:deep(.text-gray-700) {
+  color: var(--color-text-primary);
+}
+:deep(.text-gray-600) {
+  color: var(--color-text-secondary);
+}
+:deep(.text-gray-500) {
+  color: var(--color-text-secondary);
+}
+:deep(.text-gray-400) {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+/* 背景色 */
+:deep(.bg-white) {
+  background-color: var(--color-bg-container);
+}
+:deep(.bg-gray-50) {
+  background-color: var(--color-bg-layout);
+}
+:deep(.bg-gray-100) {
+  background-color: var(--color-bg-active);
+}
+
+/* 边框 */
+:deep(.border-gray-100) {
+  border-color: var(--color-border);
+}
+:deep(.border-gray-200) {
+  border-color: var(--color-border);
+}
+
+/* 输入框 */
+:deep(input[type="date"]),
+:deep(select) {
+  background-color: var(--color-bg-layout);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* 悬停状态 */
+:deep(.hover\:bg-gray-50:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:bg-gray-100:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:bg-gray-200:hover) {
+  background-color: var(--color-bg-active);
+}
+:deep(.hover\:text-gray-800:hover) {
+  color: var(--color-text-primary);
+}
+:deep(.hover\:text-gray-600:hover) {
+  color: var(--color-text-primary);
+}
+</style>
+
 

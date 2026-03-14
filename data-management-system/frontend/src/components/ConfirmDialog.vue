@@ -72,7 +72,7 @@ const handleCancel = () => {
           <component :is="getIconComponent()" class="w-6 h-6" />
         </div>
         <div class="flex-1">
-          <p class="text-gray-800">{{ message }}</p>
+          <p class="confirm-message">{{ message }}</p>
         </div>
       </div>
     </div>
@@ -80,7 +80,7 @@ const handleCancel = () => {
     <template #footer>
       <div class="flex justify-end gap-3">
         <button
-          class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          class="px-4 py-2 cancel-btn rounded-lg transition-colors disabled:opacity-50"
           :disabled="loading"
           @click="handleCancel"
         >
@@ -88,7 +88,7 @@ const handleCancel = () => {
         </button>
         <button
           class="px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
-          :class="type === 'error' ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:bg-primary-dark'"
+          :class="type === 'error' ? 'bg-red-500 hover:bg-red-600' : 'primary-btn'"
           :disabled="loading"
           @click="handleConfirm"
         >
@@ -102,3 +102,26 @@ const handleCancel = () => {
     </template>
   </Modal>
 </template>
+
+<style scoped>
+.confirm-message {
+  color: var(--color-text-primary);
+}
+
+.cancel-btn {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.cancel-btn:hover {
+  background-color: var(--color-border);
+}
+
+.primary-btn {
+  background-color: var(--color-primary);
+}
+
+.primary-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+</style>

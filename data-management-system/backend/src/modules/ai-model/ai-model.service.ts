@@ -2,7 +2,7 @@
  * AI模型管理服务
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AIModelConfig, AIModelPricing } from '@/database/entities';
 import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, CreateModelPricingDto, UpdateModelPricingDto } from './dto';
+import { encrypt, decrypt } from '@/common/utils/crypto.util';
 
 @Injectable()
 export class AIModelService {
@@ -22,34 +23,60 @@ export class AIModelService {
 
   /**
    * 获取所有模型列表
+   * API密钥已脱敏处理
    */
   async findAll(): Promise<AIModelConfig[]> {
-    return this.modelRepository.find({
+    const models = await this.modelRepository.find({
       order: { createdAt: 'DESC' },
+    });
+    // 对API密钥进行脱敏
+    return models.map(model => {
+      if (model.apiKey) {
+        model.apiKey = this.maskApiKey(model.apiKey);
+      }
+      return model;
     });
   }
 
   /**
    * 获取启用的模型列表
+   * API密钥已脱敏处理
    */
   async findEnabled(): Promise<AIModelConfig[]> {
-    return this.modelRepository.find({
+    const models = await this.modelRepository.find({
       where: { isEnabled: true },
       order: { isDefault: 'DESC', createdAt: 'DESC' },
+    });
+    // 对API密钥进行脱敏
+    return models.map(model => {
+      if (model.apiKey) {
+        model.apiKey = this.maskApiKey(model.apiKey);
+      }
+      return model;
     });
   }
 
   /**
    * 获取默认模型
+   * 注意：返回的模型对象中apiKey已解密，供AI服务内部使用
    */
   async findDefault(): Promise<AIModelConfig | null> {
-    return this.modelRepository.findOne({
+    const model = await this.modelRepository.findOne({
       where: { isDefault: true, isEnabled: true },
     });
+    if (!model) {
+      return null;
+    }
+    // 解密API密钥供内部使用
+    if (model.apiKey) {
+      model.apiKey = decrypt(model.apiKey);
+    }
+    return model;
   }
 
   /**
    * 获取模型详情
+   * 注意：返回的模型对象中apiKey已解密，供内部服务使用
    */
   async findById(modelId: string): Promise<AIModelConfig> {
     const model = await this.modelRepository.findOne({
@@ -58,7 +85,43 @@ export class AIModelService {
     if (!model) {
       throw new NotFoundException(`模型 ${modelId} 不存在`);
     }
+    // 解密API密钥供内部使用
+    if (model.apiKey) {
+      model.apiKey = decrypt(model.apiKey);
+    }
     return model;
+  }
+
+  /**
+   * 获取模型详情（保留加密状态，用于列表展示）
+   */
+  async findByIdProtected(modelId: string): Promise<AIModelConfig> {
+    const model = await this.modelRepository.findOne({
+      where: { modelId },
+    });
+    if (!model) {
+      throw new NotFoundException(`模型 ${modelId} 不存在`);
+    }
+    // 返回时对API密钥进行脱敏
+    if (model.apiKey) {
+      model.apiKey = this.maskApiKey(model.apiKey);
+    }
+    return model;
+  }
+
+  /**
+   * 脱敏显示API密钥
+   */
+  private maskApiKey(encryptedKey: string): string {
+    try {
+      const decrypted = decrypt(encryptedKey);
+      if (decrypted.length <= 8) {
+        return '****';
+      }
+      return decrypted.substring(0, 4) + '****' + decrypted.substring(decrypted.length - 4);
+    } catch {
+      return '****';
+    }
   }
 
   /**
@@ -75,7 +138,7 @@ export class AIModelService {
       modelName: dto.modelName,
       modelType: dto.modelType,
       apiEndpoint: dto.apiEndpoint,
-      apiKey: dto.apiKey, // TODO: 加密存储
+      apiKey: encrypt(dto.apiKey), // 加密存储API密钥
       modelIdentifier: dto.modelIdentifier,
       parameters: dto.parameters || {},
       isEnabled: dto.isEnabled ?? true,
@@ -96,8 +159,11 @@ export class AIModelService {
       await this.clearDefaultFlag();
     }
 
-    // 如果 apiKey 为空或未提供，保留原有值
-    if (!dto.apiKey) {
+    // 如果提供了新的apiKey，加密后存储
+    if (dto.apiKey) {
+      dto.apiKey = encrypt(dto.apiKey);
+    } else {
+      // 如果 apiKey 为空或未提供，保留原有值
       delete dto.apiKey;
     }
 
@@ -228,6 +294,7 @@ export class AIModelService {
    * 通过模型ID测试连接（使用已保存的配置）
    */
   async testConnectionById(modelId: string): Promise<{ success: boolean; message: string; responseTime?: number }> {
+    // 获取模型（apiKey已解密）
     const model = await this.findById(modelId);
     return this.testConnection({
       apiEndpoint: model.apiEndpoint,

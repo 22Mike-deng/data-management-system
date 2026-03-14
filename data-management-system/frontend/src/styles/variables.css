@@ -1,0 +1,170 @@
+/**
+ * 主题相关CSS变量
+ * 创建者：dzh
+ * 创建时间：2026-03-14
+ * 更新时间：2026-03-14
+ */
+
+/* 亮色主题（默认） */
+:root {
+  /* 主色调 */
+  --color-primary: #3b82f6;
+  --color-primary-light: #60a5fa;
+  --color-primary-dark: #1d4ed8;
+  
+  /* 背景色 */
+  --color-bg-page: #f5f7fa;
+  --color-bg-container: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #f0f2f5;
+  --color-bg-active: #e8eaef;
+  --color-bg-mask: rgba(0, 0, 0, 0.45);
+  
+  /* 文字色 */
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-text-placeholder: #9ca3af;
+  --color-text-disabled: #d1d5db;
+  
+  /* 边框色 */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-border-focus: #3b82f6;
+  
+  /* 状态色 */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* 图表色板 */
+  --chart-colors: #3b82f6, #10b981, #f59e0b, #ef4444, #8b5cf6, #ec4899, #06b6d4, #84cc16;
+  
+  /* 间距变量 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  
+  /* 过渡动画 */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+}
+
+/* 深色主题 */
+[data-theme='dark'] {
+  /* 主色调 */
+  --color-primary: #60a5fa;
+  --color-primary-light: #93c5fd;
+  --color-primary-dark: #3b82f6;
+  
+  /* 背景色 */
+  --color-bg-page: #111827;
+  --color-bg-container: #1f2937;
+  --color-bg-card: #374151;
+  --color-bg-hover: #4b5563;
+  --color-bg-active: #6b7280;
+  --color-bg-mask: rgba(0, 0, 0, 0.65);
+  
+  /* 文字色 */
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-placeholder: #9ca3af;
+  --color-text-disabled: #6b7280;
+  
+  /* 边框色 */
+  --color-border: #374151;
+  --color-border-light: #4b5563;
+  --color-border-focus: #60a5fa;
+  
+  /* 状态色 */
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --color-info: #60a5fa;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  
+  /* 图表色板（深色模式优化） */
+  --chart-colors: #60a5fa, #34d399, #fbbf24, #f87171, #a78bfa, #f472b6, #22d3ee, #a3e635;
+}
+
+/* 全局过渡效果 */
+* {
+  transition: background-color var(--transition-normal),
+              border-color var(--transition-normal),
+              color var(--transition-normal);
+}
+
+/* 禁用过渡效果的元素（避免不必要的动画） */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-container);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-placeholder);
+}
+
+/* 选中文本样式 */
+::selection {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* 通用工具类 */
+.bg-page {
+  background-color: var(--color-bg-page);
+}
+
+.bg-container {
+  background-color: var(--color-bg-container);
+}
+
+.bg-card {
+  background-color: var(--color-bg-card);
+}
+
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.border-default {
+  border-color: var(--color-border);
+}

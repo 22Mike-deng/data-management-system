@@ -2,7 +2,7 @@
  * 路由配置
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-14
  */
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 
@@ -72,6 +72,12 @@ const routes: RouteRecordRaw[] = [
         name: 'TokenStats',
         component: () => import('@/views/token-stats/index.vue'),
         meta: { title: 'Token统计', icon: 'chart-line' },
+      },
+      {
+        path: 'audit-log',
+        name: 'AuditLog',
+        component: () => import('@/views/audit-log/index.vue'),
+        meta: { title: '审计日志', icon: 'file-text' },
       },
       {
         path: 'settings',

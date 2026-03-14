@@ -2,14 +2,16 @@
  * 数据管理页面（动态CRUD）
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-12
+ * 更新时间：2026-03-14
  */
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, Edit, Trash2, Download, Upload, ArrowLeft, Search, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Plus, Edit, Trash2, Download, Upload, ArrowLeft, Search, ChevronLeft, ChevronRight, FileSpreadsheet, FileJson, FileText } from 'lucide-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { getTableById, getTableFields, getTableList } from '@/api/table-meta'
 import { getDataList, createData, updateData, deleteData, batchDeleteData, createDynamicTable } from '@/api/dynamic-data'
+import { importData, exportData, downloadTemplate } from '@/api/data-import-export'
 import type { TableDefinition, FieldDefinition, FieldType } from '@/types'
 import Modal from '@/components/Modal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -53,6 +55,23 @@ const deleteLoading = ref(false)
 const selectedIds = ref<string[]>([])
 const showBatchDeleteConfirm = ref(false)
 const batchDeleteLoading = ref(false)
+
+// 导入相关
+const showImportModal = ref(false)
+const importFile = ref<File | null>(null)
+const importFormat = ref<'csv' | 'json' | 'xlsx'>('xlsx')
+const importLoading = ref(false)
+const importProgress = ref(0)
+const importResult = ref<{
+  success: boolean
+  total: number
+  inserted: number
+  skipped: number
+  errors: Array<{ row: number; message: string }>
+} | null>(null)
+
+// 导出格式选择
+const showExportModal = ref(false)
 
 // 加载表结构
 const loadTableInfo = async () => {
@@ -218,10 +237,11 @@ const handleSave = async () => {
     }
     showModal.value = false
     loadData()
+    MessagePlugin.success('保存成功')
   } catch (error: any) {
     console.error('保存数据失败:', error)
     const errorMsg = error.response?.data?.message || error.message || '保存失败，请重试'
-    alert(errorMsg)
+    MessagePlugin.error(errorMsg)
   } finally {
     saveLoading.value = false
   }
@@ -240,9 +260,10 @@ const confirmDelete = async () => {
     await deleteData(tableId.value, deleteTarget.value.id)
     showDeleteConfirm.value = false
     loadData()
+    MessagePlugin.success('删除成功')
   } catch (error) {
     console.error('删除数据失败:', error)
-    alert('删除失败，请重试')
+    MessagePlugin.error('删除失败，请重试')
   } finally {
     deleteLoading.value = false
   }
@@ -251,7 +272,7 @@ const confirmDelete = async () => {
 // 批量删除
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) {
-    alert('请先选择要删除的数据')
+    MessagePlugin.warning('请先选择要删除的数据')
     return
   }
   showBatchDeleteConfirm.value = true
@@ -264,9 +285,10 @@ const confirmBatchDelete = async () => {
     showBatchDeleteConfirm.value = false
     selectedIds.value = []
     loadData()
+    MessagePlugin.success('批量删除成功')
   } catch (error) {
     console.error('批量删除失败:', error)
-    alert('删除失败，请重试')
+    MessagePlugin.error('删除失败，请重试')
   } finally {
     batchDeleteLoading.value = false
   }
@@ -300,37 +322,74 @@ const handlePageChange = (page: number) => {
 
 // 导入数据
 const handleImport = () => {
-  alert('导入功能开发中...')
+  showImportModal.value = true
+  importFile.value = null
+  importResult.value = null
+  importProgress.value = 0
+}
+
+// 选择文件
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    importFile.value = target.files[0]
+    // 根据文件扩展名自动选择格式
+    const ext = importFile.value.name.split('.').pop()?.toLowerCase()
+    if (ext === 'csv') importFormat.value = 'csv'
+    else if (ext === 'json') importFormat.value = 'json'
+    else importFormat.value = 'xlsx'
+  }
+}
+
+// 执行导入
+const handleDoImport = async () => {
+  if (!importFile.value) {
+    MessagePlugin.warning('请选择要导入的文件')
+    return
+  }
+
+  importLoading.value = true
+  importProgress.value = 0
+  importResult.value = null
+
+  try {
+    const res = await importData(
+      tableId.value,
+      importFile.value,
+      importFormat.value,
+      (percent) => {
+        importProgress.value = percent
+      }
+    )
+    importResult.value = res.data
+    
+    if (res.data.success && res.data.inserted > 0) {
+      MessagePlugin.success(`成功导入 ${res.data.inserted} 条数据`)
+      loadData() // 刷新列表
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    MessagePlugin.error(error.response?.data?.message || '导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+// 下载模板
+const handleDownloadTemplate = () => {
+  downloadTemplate(tableId.value, importFormat.value)
 }
 
 // 导出数据
 const handleExport = () => {
-  // 简单的CSV导出
-  if (dataList.value.length === 0) {
-    alert('没有数据可导出')
-    return
-  }
-  
-  const headers = fields.value.map(f => f.displayName).join(',')
-  const rows = dataList.value.map(row => 
-    fields.value.map(f => {
-      const val = row[f.fieldName]
-      if (val === null || val === undefined) return ''
-      if (typeof val === 'string' && val.includes(',')) {
-        return `"${val}"`
-      }
-      return val
-    }).join(',')
-  )
-  
-  const csv = [headers, ...rows].join('\n')
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${tableInfo.value?.tableName || 'export'}_${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  showExportModal.value = true
+}
+
+// 执行导出
+const handleDoExport = (format: 'csv' | 'json' | 'xlsx') => {
+  exportData(tableId.value, format)
+  showExportModal.value = false
+  MessagePlugin.success('正在导出，请稍候...')
 }
 
 // 返回
@@ -439,18 +498,18 @@ watch(tableId, () => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn">
+  <div class="space-y-6 animate-fadeIn data-manage-page">
     <!-- 顶部导航 -->
     <div class="flex items-center gap-3">
       <button
-        class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        class="p-2 back-btn rounded-lg transition-colors"
         @click="goBack"
       >
         <ArrowLeft class="w-5 h-5" />
       </button>
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">{{ tableInfo?.displayName || '数据管理' }}</h2>
-        <p class="text-sm text-gray-500">{{ tableInfo?.description || '管理数据表中的数据记录' }}</p>
+        <h2 class="text-xl font-semibold page-title">{{ tableInfo?.displayName || '数据管理' }}</h2>
+        <p class="text-sm page-desc">{{ tableInfo?.description || '管理数据表中的数据记录' }}</p>
       </div>
     </div>
 
@@ -459,17 +518,17 @@ watch(tableId, () => {
       <div class="flex items-center gap-3">
         <!-- 搜索框 -->
         <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 search-icon" />
           <input
             v-model="searchKeyword"
             type="text"
             placeholder="搜索..."
-            class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-64"
+            class="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-64 search-input"
             @keyup.enter="handleSearch"
           />
         </div>
         <button
-          class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+          class="px-4 py-2 secondary-btn rounded-lg transition-colors"
           @click="handleSearch"
         >
           搜索
@@ -478,28 +537,28 @@ watch(tableId, () => {
       <div class="flex items-center gap-3">
         <button
           v-if="selectedIds.length > 0"
-          class="flex items-center gap-2 px-3 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 danger-btn rounded-lg transition-colors"
           @click="handleBatchDelete"
         >
           <Trash2 class="w-4 h-4" />
           <span>删除 ({{ selectedIds.length }})</span>
         </button>
         <button
-          class="flex items-center gap-2 px-3 py-2 text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 outline-btn rounded-lg transition-colors"
           @click="handleImport"
         >
           <Upload class="w-4 h-4" />
           <span>导入</span>
         </button>
         <button
-          class="flex items-center gap-2 px-3 py-2 text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 outline-btn rounded-lg transition-colors"
           @click="handleExport"
         >
           <Download class="w-4 h-4" />
           <span>导出</span>
         </button>
         <button
-          class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          class="flex items-center gap-2 px-4 py-2 primary-btn rounded-lg transition-colors"
           @click="handleAdd"
         >
           <Plus class="w-4 h-4" />
@@ -509,14 +568,14 @@ watch(tableId, () => {
     </div>
 
     <!-- 数据表格 -->
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div v-if="loading" class="p-8 text-center text-gray-500">
+    <div class="table-container rounded-xl shadow-sm overflow-hidden">
+      <div v-if="loading" class="p-8 text-center loading-text">
         加载中...
       </div>
       <div v-else-if="dataList.length === 0" class="p-8 text-center">
-        <p class="text-gray-500 mb-4">暂无数据</p>
+        <p class="empty-text mb-4">暂无数据</p>
         <button
-          class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          class="px-4 py-2 primary-btn rounded-lg transition-colors"
           @click="handleAdd"
         >
           添加第一条数据
@@ -524,44 +583,44 @@ watch(tableId, () => {
       </div>
       <div v-else class="overflow-x-auto">
         <table class="w-full">
-          <thead class="bg-gray-50 border-b border-gray-100">
+          <thead class="table-header border-b">
             <tr>
               <th class="text-left px-4 py-3 w-12">
                 <input
                   type="checkbox"
                   :checked="selectedIds.length === dataList.length && dataList.length > 0"
-                  class="rounded border-gray-300 text-primary focus:ring-primary"
+                  class="rounded text-primary focus:ring-primary"
                   @change="handleSelectAll"
                 />
               </th>
-              <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 w-20">ID</th>
+              <th class="text-left px-4 py-3 text-sm font-medium th-text w-20">ID</th>
               <th
                 v-for="field in fields.filter(f => !['image', 'file', 'richtext'].includes(f.fieldType))"
                 :key="field.fieldId"
-                class="text-left px-4 py-3 text-sm font-medium text-gray-600"
+                class="text-left px-4 py-3 text-sm font-medium th-text"
               >
                 {{ field.displayName }}
               </th>
-              <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">创建时间</th>
-              <th class="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">更新时间</th>
-              <th class="text-right px-4 py-3 text-sm font-medium text-gray-600 w-32">操作</th>
+              <th class="text-left px-4 py-3 text-sm font-medium th-text w-32">创建时间</th>
+              <th class="text-left px-4 py-3 text-sm font-medium th-text w-32">更新时间</th>
+              <th class="text-right px-4 py-3 text-sm font-medium th-text w-32">操作</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="row in dataList" :key="row.id" class="hover:bg-gray-50">
+          <tbody class="divide-y table-divider">
+            <tr v-for="row in dataList" :key="row.id" class="table-row">
               <td class="px-4 py-3">
                 <input
                   type="checkbox"
                   :checked="selectedIds.includes(row.id)"
-                  class="rounded border-gray-300 text-primary focus:ring-primary"
+                  class="rounded text-primary focus:ring-primary"
                   @change="handleSelect(row.id)"
                 />
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500 font-mono">{{ row.id }}</td>
+              <td class="px-4 py-3 text-sm td-id font-mono">{{ row.id }}</td>
               <td
                 v-for="field in fields.filter(f => !['image', 'file', 'richtext'].includes(f.fieldType))"
                 :key="field.fieldId"
-                class="px-4 py-3 text-sm text-gray-800"
+                class="px-4 py-3 text-sm td-text"
               >
                 <span v-if="field.fieldType === 'image' && row[field.fieldName]" class="text-primary">
                   [图片]
@@ -576,18 +635,18 @@ watch(tableId, () => {
                   {{ formatValue(row[field.fieldName], field) }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{{ formatDateTime(row.created_at) }}</td>
-              <td class="px-4 py-3 text-sm text-gray-500">{{ formatDateTime(row.updated_at) }}</td>
+              <td class="px-4 py-3 text-sm td-secondary">{{ formatDateTime(row.created_at) }}</td>
+              <td class="px-4 py-3 text-sm td-secondary">{{ formatDateTime(row.updated_at) }}</td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
-                    class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+                    class="p-2 action-btn rounded-lg transition-colors"
                     @click="handleEdit(row)"
                   >
                     <Edit class="w-4 h-4" />
                   </button>
                   <button
-                    class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    class="p-2 delete-btn rounded-lg transition-colors"
                     @click="handleDelete(row)"
                   >
                     <Trash2 class="w-4 h-4" />
@@ -600,23 +659,23 @@ watch(tableId, () => {
       </div>
 
       <!-- 分页 -->
-      <div v-if="pagination.total > 0" class="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-        <div class="text-sm text-gray-500">
+      <div v-if="pagination.total > 0" class="flex items-center justify-between px-4 py-3 border-t table-divider">
+        <div class="text-sm td-secondary">
           共 {{ pagination.total }} 条记录
         </div>
         <div class="flex items-center gap-2">
           <button
-            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            class="p-2 page-btn rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="pagination.page <= 1"
             @click="handlePageChange(pagination.page - 1)"
           >
             <ChevronLeft class="w-4 h-4" />
           </button>
-          <span class="text-sm text-gray-600">
+          <span class="text-sm page-info">
             {{ pagination.page }} / {{ Math.ceil(pagination.total / pagination.pageSize) }}
           </span>
           <button
-            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            class="p-2 page-btn rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="pagination.page >= Math.ceil(pagination.total / pagination.pageSize)"
             @click="handlePageChange(pagination.page + 1)"
           >
@@ -634,7 +693,7 @@ watch(tableId, () => {
     >
       <div class="p-6 space-y-4 max-h-[60vh] overflow-auto">
         <div v-for="field in fields" :key="field.fieldId" class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">
+          <label class="block text-sm font-medium form-label">
             {{ field.displayName }}
             <span v-if="field.required" class="text-red-500">*</span>
           </label>
@@ -647,7 +706,7 @@ watch(tableId, () => {
             :placeholder="`请输入${field.displayName}`"
             :required="field.required"
             :step="['float', 'double', 'decimal'].includes(field.fieldType) ? 'any' : undefined"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
           />
 
           <!-- 外键关联选择 -->
@@ -655,7 +714,7 @@ watch(tableId, () => {
             v-else-if="field.isForeignKey && field.foreignKeyTable"
             v-model="formData[field.fieldName]"
             :required="field.required"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
           >
             <option value="">请选择{{ field.displayName }}</option>
             <option
@@ -674,7 +733,7 @@ watch(tableId, () => {
             :placeholder="`请输入${field.displayName}`"
             :required="field.required"
             rows="4"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none form-input"
           ></textarea>
 
           <!-- 布尔值 -->
@@ -694,7 +753,7 @@ watch(tableId, () => {
             v-else-if="field.fieldType === 'select'"
             v-model="formData[field.fieldName]"
             :required="field.required"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
           >
             <option value="">请选择{{ field.displayName }}</option>
             <option v-for="opt in field.options" :key="opt.value" :value="opt.value">
@@ -711,7 +770,7 @@ watch(tableId, () => {
               :class="
                 (formData[field.fieldName] || []).includes(opt.value)
                   ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-primary'
+                  : 'multiselect-option'
               "
             >
               <input
@@ -742,7 +801,7 @@ watch(tableId, () => {
             type="url"
             v-model="formData[field.fieldName]"
             :placeholder="`请输入${field.displayName}URL`"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
           />
 
           <!-- JSON对象输入 -->
@@ -752,20 +811,20 @@ watch(tableId, () => {
             :placeholder="`请输入JSON格式数据，例如：{&quot;key&quot;: &quot;value&quot;}`"
             :required="field.required"
             rows="4"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-mono text-sm"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-mono text-sm form-input"
           ></textarea>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
           <button
-            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            class="px-4 py-2 secondary-btn rounded-lg transition-colors"
             @click="showModal = false"
           >
             取消
           </button>
           <button
-            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            class="px-4 py-2 primary-btn rounded-lg transition-colors disabled:opacity-50"
             :disabled="saveLoading"
             @click="handleSave"
           >
@@ -796,5 +855,325 @@ watch(tableId, () => {
       :loading="batchDeleteLoading"
       @confirm="confirmBatchDelete"
     />
+
+    <!-- 导入弹窗 -->
+    <Modal
+      v-model:visible="showImportModal"
+      title="导入数据"
+      width="500px"
+    >
+      <div class="p-6 space-y-4">
+        <!-- 格式选择 -->
+        <div>
+          <label class="block text-sm font-medium form-label mb-2">文件格式</label>
+          <div class="flex gap-2">
+            <button
+              v-for="fmt in ['xlsx', 'csv', 'json'] as const"
+              :key="fmt"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+              :class="importFormat === fmt ? 'bg-primary text-white border-primary' : 'format-option'"
+              @click="importFormat = fmt"
+            >
+              <FileSpreadsheet v-if="fmt === 'xlsx'" class="w-4 h-4" />
+              <FileText v-else-if="fmt === 'csv'" class="w-4 h-4" />
+              <FileJson v-else class="w-4 h-4" />
+              {{ fmt.toUpperCase() }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 文件选择 -->
+        <div>
+          <label class="block text-sm font-medium form-label mb-2">选择文件</label>
+          <input
+            type="file"
+            :accept="importFormat === 'xlsx' ? '.xlsx,.xls' : importFormat === 'csv' ? '.csv' : '.json'"
+            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary form-input"
+            @change="handleFileSelect"
+          />
+          <p v-if="importFile" class="text-sm file-info mt-1">
+            已选择: {{ importFile.name }}
+          </p>
+        </div>
+
+        <!-- 模板下载 -->
+        <div class="flex items-center gap-2 text-sm">
+          <span class="td-secondary">没有模板？</span>
+          <button
+            class="text-primary hover:underline"
+            @click="handleDownloadTemplate"
+          >
+            点击下载导入模板
+          </button>
+        </div>
+
+        <!-- 上传进度 -->
+        <div v-if="importLoading" class="space-y-2">
+          <div class="flex items-center justify-between text-sm">
+            <span class="td-text">上传进度</span>
+            <span class="text-primary">{{ importProgress }}%</span>
+          </div>
+          <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-primary transition-all duration-300"
+              :style="{ width: `${importProgress}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- 导入结果 -->
+        <div v-if="importResult" class="space-y-2 p-4 import-result rounded-lg">
+          <div class="flex items-center gap-2">
+            <span :class="importResult.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+              {{ importResult.success ? '导入完成' : '导入失败' }}
+            </span>
+          </div>
+          <div class="text-sm td-text">
+            <p>总记录数: {{ importResult.total }}</p>
+            <p>成功导入: {{ importResult.inserted }}</p>
+            <p>跳过记录: {{ importResult.skipped }}</p>
+          </div>
+          <div v-if="importResult.errors.length > 0" class="mt-2">
+            <p class="text-sm font-medium text-red-600 mb-1">错误信息:</p>
+            <ul class="text-xs text-red-500 space-y-1 max-h-32 overflow-auto">
+              <li v-for="err in importResult.errors.slice(0, 10)" :key="err.row">
+                第{{ err.row }}行: {{ err.message }}
+              </li>
+              <li v-if="importResult.errors.length > 10" class="td-secondary">
+                ...还有 {{ importResult.errors.length - 10 }} 条错误
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button
+            class="px-4 py-2 secondary-btn rounded-lg transition-colors"
+            @click="showImportModal = false"
+          >
+            关闭
+          </button>
+          <button
+            v-if="!importResult"
+            class="px-4 py-2 primary-btn rounded-lg transition-colors disabled:opacity-50"
+            :disabled="importLoading || !importFile"
+            @click="handleDoImport"
+          >
+            {{ importLoading ? '导入中...' : '开始导入' }}
+          </button>
+        </div>
+      </template>
+    </Modal>
+
+    <!-- 导出弹窗 -->
+    <Modal
+      v-model:visible="showExportModal"
+      title="导出数据"
+      width="400px"
+    >
+      <div class="p-6">
+        <p class="text-sm td-text mb-4">请选择导出格式：</p>
+        <div class="grid grid-cols-3 gap-3">
+          <button
+            v-for="fmt in ['xlsx', 'csv', 'json'] as const"
+            :key="fmt"
+            class="flex flex-col items-center gap-2 p-4 rounded-lg border export-option transition-colors"
+            @click="handleDoExport(fmt)"
+          >
+            <FileSpreadsheet v-if="fmt === 'xlsx'" class="w-8 h-8 text-green-600" />
+            <FileText v-else-if="fmt === 'csv'" class="w-8 h-8 text-blue-600" />
+            <FileJson v-else class="w-8 h-8 text-orange-600" />
+            <span class="text-sm font-medium td-text">{{ fmt.toUpperCase() }}</span>
+          </button>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.data-manage-page {
+  background-color: var(--color-bg-layout);
+}
+
+.back-btn {
+  color: var(--color-text-placeholder);
+}
+
+.back-btn:hover {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-active);
+}
+
+.page-title {
+  color: var(--color-text-primary);
+}
+
+.page-desc {
+  color: var(--color-text-secondary);
+}
+
+.search-icon {
+  color: var(--color-text-placeholder);
+}
+
+.search-input {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.secondary-btn {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.secondary-btn:hover {
+  background-color: var(--color-border);
+}
+
+.danger-btn {
+  color: var(--color-error);
+  background-color: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+}
+
+.danger-btn:hover {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.outline-btn {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-container);
+  border: 1px solid var(--color-border);
+}
+
+.outline-btn:hover {
+  background-color: var(--color-bg-active);
+}
+
+.primary-btn {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.primary-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.table-container {
+  background-color: var(--color-bg-container);
+}
+
+.loading-text,
+.empty-text {
+  color: var(--color-text-secondary);
+}
+
+.table-header {
+  background-color: var(--color-bg-active);
+  border-color: var(--color-border);
+}
+
+.th-text {
+  color: var(--color-text-secondary);
+}
+
+.table-divider {
+  border-color: var(--color-border);
+}
+
+.table-row:hover {
+  background-color: var(--color-bg-active);
+}
+
+.td-id,
+.td-secondary {
+  color: var(--color-text-placeholder);
+}
+
+.td-text {
+  color: var(--color-text-primary);
+}
+
+.action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.action-btn:hover {
+  color: var(--color-primary);
+  background-color: var(--color-bg-active);
+}
+
+.delete-btn {
+  color: var(--color-text-placeholder);
+}
+
+.delete-btn:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-bg);
+}
+
+.page-btn {
+  color: var(--color-text-placeholder);
+}
+
+.page-btn:hover:not(:disabled) {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-active);
+}
+
+.page-info {
+  color: var(--color-text-secondary);
+}
+
+.form-label {
+  color: var(--color-text-primary);
+}
+
+.form-input {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.multiselect-option {
+  background-color: var(--color-bg-container);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.multiselect-option:hover {
+  border-color: var(--color-primary);
+}
+
+.format-option {
+  background-color: var(--color-bg-container);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.format-option:hover {
+  border-color: var(--color-primary);
+}
+
+.file-info {
+  color: var(--color-text-secondary);
+}
+
+.import-result {
+  background-color: var(--color-bg-active);
+}
+
+.export-option {
+  border-color: var(--color-border);
+}
+
+.export-option:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-bg);
+}
+</style>

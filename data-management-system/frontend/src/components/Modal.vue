@@ -69,18 +69,18 @@ watch(
 
         <!-- 弹窗内容 -->
         <div
-          class="relative bg-white rounded-xl shadow-2xl overflow-hidden animate-modalIn"
+          class="relative modal-content rounded-xl shadow-2xl overflow-hidden animate-modalIn"
           :style="{ width, maxWidth: '90vw', maxHeight: '90vh' }"
         >
           <!-- 头部 -->
           <div
             v-if="title || closable"
-            class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
+            class="flex items-center justify-between px-6 py-4 border-b modal-border"
           >
-            <h3 class="text-lg font-semibold text-gray-800">{{ title }}</h3>
+            <h3 class="text-lg font-semibold modal-title">{{ title }}</h3>
             <button
               v-if="closable"
-              class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-1 modal-close-btn rounded-lg transition-colors"
               @click="handleClose"
             >
               <X class="w-5 h-5" />
@@ -93,7 +93,7 @@ watch(
           </div>
 
           <!-- 底部 -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <div v-if="$slots.footer" class="px-6 py-4 border-t modal-border modal-footer">
             <slot name="footer"></slot>
           </div>
         </div>
@@ -126,5 +126,31 @@ watch(
 
 .animate-modalIn {
   animation: modalIn 0.2s ease-out;
+}
+
+/* 主题适配样式 */
+.modal-content {
+  background-color: var(--color-bg-container);
+}
+
+.modal-border {
+  border-color: var(--color-border);
+}
+
+.modal-title {
+  color: var(--color-text-primary);
+}
+
+.modal-close-btn {
+  color: var(--color-text-placeholder);
+}
+
+.modal-close-btn:hover {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-active);
+}
+
+.modal-footer {
+  background-color: var(--color-bg-active);
 }
 </style>

@@ -367,15 +367,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn">
+  <div class="space-y-6 animate-fadeIn ai-model-page">
     <!-- 操作栏 -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">AI模型管理</h2>
-        <p class="text-sm text-gray-500 mt-1">配置和管理AI模型，支持OpenAI、通义千问、文心一言等</p>
+        <h2 class="text-xl font-semibold page-title">AI模型管理</h2>
+        <p class="text-sm page-desc mt-1">配置和管理AI模型，支持OpenAI、通义千问、文心一言等</p>
       </div>
       <button
-        class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+        class="flex items-center gap-2 px-4 py-2 primary-btn text-white rounded-lg transition-colors"
         @click="handleAdd"
       >
         <Plus class="w-4 h-4" />
@@ -384,16 +384,16 @@ onMounted(() => {
     </div>
 
     <!-- 模型列表 -->
-    <div v-if="loading" class="text-center py-8 text-gray-500">
+    <div v-if="loading" class="text-center py-8 loading-text">
       加载中...
     </div>
-    <div v-else-if="modelList.length === 0" class="bg-white rounded-xl shadow-sm p-8 text-center">
-      <div class="text-gray-400 mb-4">
+    <div v-else-if="modelList.length === 0" class="empty-card rounded-xl shadow-sm p-8 text-center">
+      <div class="empty-icon mb-4">
         <Zap class="w-12 h-12 mx-auto" />
       </div>
-      <p class="text-gray-500 mb-4">暂无AI模型配置</p>
+      <p class="empty-text mb-4">暂无AI模型配置</p>
       <button
-        class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+        class="px-4 py-2 primary-btn text-white rounded-lg transition-colors"
         @click="handleAdd"
       >
         添加第一个模型
@@ -403,13 +403,13 @@ onMounted(() => {
       <div
         v-for="model in modelList"
         :key="model.modelId"
-        class="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow relative"
-        :class="{ 'ring-2 ring-primary': model.isDefault }"
+        class="model-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow relative"
+        :class="{ 'model-default': model.isDefault }"
       >
         <!-- 默认标记 -->
         <div
           v-if="model.isDefault"
-          class="absolute top-3 right-3 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full flex items-center gap-1"
+          class="absolute top-3 right-3 px-2 py-1 default-tag text-xs rounded-full flex items-center gap-1"
         >
           <Star class="w-3 h-3" />
           默认
@@ -417,38 +417,38 @@ onMounted(() => {
 
         <div class="flex items-start justify-between mb-4">
           <div>
-            <h3 class="font-semibold text-gray-800">{{ model.modelName }}</h3>
-            <span class="text-xs text-gray-500">{{ modelTypeOptions.find(o => o.value === model.modelType)?.label || model.modelType }}</span>
+            <h3 class="font-semibold card-title">{{ model.modelName }}</h3>
+            <span class="text-xs card-desc">{{ modelTypeOptions.find(o => o.value === model.modelType)?.label || model.modelType }}</span>
           </div>
           <span
             class="px-2 py-1 text-xs rounded-full"
-            :class="model.isEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'"
+            :class="model.isEnabled ? 'enabled-tag' : 'disabled-tag'"
           >
             {{ model.isEnabled ? '已启用' : '已禁用' }}
           </span>
         </div>
-        <div class="text-sm text-gray-500 mb-4">
+        <div class="text-sm card-desc mb-4">
           <p class="font-mono text-xs">{{ model.modelIdentifier }}</p>
           <p class="text-xs mt-1 truncate" :title="model.apiEndpoint">{{ model.apiEndpoint }}</p>
         </div>
-        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+        <div class="flex items-center justify-between pt-4 card-divider">
           <div class="flex items-center gap-1">
             <button
-              class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 action-btn rounded-lg transition-colors"
               title="测试连接"
               @click="handleEdit(model); showModal = true; handleTest()"
             >
               <Zap class="w-4 h-4" />
             </button>
             <button
-              class="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 action-btn rounded-lg transition-colors"
               title="编辑"
               @click="handleEdit(model)"
             >
               <Edit class="w-4 h-4" />
             </button>
             <button
-              class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              class="p-2 delete-action-btn rounded-lg transition-colors"
               title="删除"
               @click="handleDelete(model)"
             >
@@ -456,7 +456,7 @@ onMounted(() => {
             </button>
             <button
               v-if="!model.isDefault"
-              class="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors"
+              class="p-2 star-action-btn rounded-lg transition-colors"
               title="设为默认"
               @click="handleSetDefault(model)"
             >
@@ -465,11 +465,7 @@ onMounted(() => {
           </div>
           <button
             class="p-2 rounded-lg transition-colors"
-            :class="
-              model.isEnabled
-                ? 'text-green-500 hover:bg-green-50'
-                : 'text-gray-400 hover:bg-gray-100'
-            "
+            :class="model.isEnabled ? 'enabled-action-btn' : 'action-btn'"
             :title="model.isEnabled ? '禁用' : '启用'"
             @click="handleToggle(model)"
           >
@@ -490,21 +486,21 @@ onMounted(() => {
         <!-- 基本信息 -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium form-label mb-1">
               模型名称 <span class="text-red-500">*</span>
             </label>
             <input
               v-model="modelForm.modelName"
               type="text"
               placeholder="例如: GPT-4"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">模型类型</label>
+            <label class="block text-sm font-medium form-label mb-1">模型类型</label>
             <select
               v-model="modelForm.modelType"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               @change="updateDefaultEndpoint(modelForm.modelType)"
             >
               <option v-for="opt in modelTypeOptions" :key="opt.value" :value="opt.value">
@@ -515,44 +511,44 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">API端点</label>
+          <label class="block text-sm font-medium form-label mb-1">API端点</label>
           <input
             v-model="modelForm.apiEndpoint"
             type="text"
             placeholder="例如: https://api.openai.com/v1"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium form-label mb-1">
             API Key <span v-if="modalMode === 'create'" class="text-red-500">*</span>
           </label>
           <input
             v-model="modelForm.apiKey"
             type="password"
             :placeholder="modalMode === 'edit' ? '留空保持不变' : '请输入API密钥'"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
-          <p v-if="modalMode === 'edit'" class="text-xs text-gray-400 mt-1">留空则保持原密钥不变</p>
+          <p v-if="modalMode === 'edit'" class="text-xs form-hint mt-1">留空则保持原密钥不变</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium form-label mb-1">
             模型标识符 <span class="text-red-500">*</span>
           </label>
           <input
             v-model="modelForm.modelIdentifier"
             type="text"
             placeholder="例如: gpt-4"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            class="w-full px-3 py-2 border form-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           <div v-if="commonModelIdentifiers[modelForm.modelType]?.length" class="flex flex-wrap gap-1 mt-2">
-            <span class="text-xs text-gray-400">快速选择：</span>
+            <span class="text-xs form-hint">快速选择：</span>
             <button
               v-for="id in commonModelIdentifiers[modelForm.modelType]"
               :key="id"
-              class="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              class="px-2 py-0.5 text-xs quick-select-btn rounded transition-colors"
               @click="modelForm.modelIdentifier = id"
             >
               {{ id }}
@@ -561,112 +557,112 @@ onMounted(() => {
         </div>
 
         <!-- 参数设置 -->
-        <div class="border-t border-gray-100 pt-4">
-          <h4 class="text-sm font-medium text-gray-700 mb-3">模型参数</h4>
+        <div class="border-t form-divider pt-4">
+          <h4 class="text-sm font-medium form-label mb-3">模型参数</h4>
           <div class="grid grid-cols-4 gap-4">
             <div>
-              <label class="block text-xs text-gray-500 mb-1">Temperature</label>
+              <label class="block text-xs form-hint mb-1">Temperature</label>
               <input
                 v-model.number="modelForm.temperature"
                 type="number"
                 min="0"
                 max="2"
                 step="0.1"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">Max Tokens</label>
+              <label class="block text-xs form-hint mb-1">Max Tokens</label>
               <input
                 v-model.number="modelForm.maxTokens"
                 type="number"
                 min="1"
                 max="1000000"
                 step="1"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
-              <p class="text-xs text-gray-400 mt-1">范围: 1-1000000</p>
+              <p class="text-xs form-hint mt-1">范围: 1-1000000</p>
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">Top P</label>
+              <label class="block text-xs form-hint mb-1">Top P</label>
               <input
                 v-model.number="modelForm.topP"
                 type="number"
                 min="0"
                 max="1"
                 step="0.1"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">上下文长度</label>
+              <label class="block text-xs form-hint mb-1">上下文长度</label>
               <input
                 v-model.number="modelForm.contextLength"
                 type="number"
                 min="1"
                 max="100"
                 step="1"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
-              <p class="text-xs text-gray-400 mt-1">记忆消息数</p>
+              <p class="text-xs form-hint mt-1">记忆消息数</p>
             </div>
           </div>
         </div>
 
         <!-- 价格设置 -->
-        <div class="border-t border-gray-100 pt-4">
-          <h4 class="text-sm font-medium text-gray-700 mb-3">模型定价</h4>
-          <div v-if="pricingLoading" class="text-center py-2 text-gray-400 text-sm">
+        <div class="border-t form-divider pt-4">
+          <h4 class="text-sm font-medium form-label mb-3">模型定价</h4>
+          <div v-if="pricingLoading" class="text-center py-2 loading-text text-sm">
             加载价格配置中...
           </div>
           <div v-else class="grid grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs text-gray-500 mb-1">输入价格 (每1K tokens)</label>
+              <label class="block text-xs form-hint mb-1">输入价格 (每1K tokens)</label>
               <div class="relative">
                 <input
                   v-model.number="pricingForm.inputPrice"
                   type="number"
                   min="0"
                   step="0.0001"
-                  class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="0.00"
                 />
               </div>
-              <p class="text-xs text-gray-400 mt-1">单位: {{ pricingForm.currency }}/1K tokens</p>
+              <p class="text-xs form-hint mt-1">单位: {{ pricingForm.currency }}/1K tokens</p>
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">输出价格 (每1K tokens)</label>
+              <label class="block text-xs form-hint mb-1">输出价格 (每1K tokens)</label>
               <input
                 v-model.number="pricingForm.outputPrice"
                 type="number"
                 min="0"
                 step="0.0001"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1">货币单位</label>
+              <label class="block text-xs form-hint mb-1">货币单位</label>
               <select
                 v-model="pricingForm.currency"
-                class="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                class="w-full px-2 py-1.5 text-sm border form-input rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="CNY">人民币 (CNY)</option>
                 <option value="USD">美元 (USD)</option>
               </select>
             </div>
           </div>
-          <p class="text-xs text-gray-400 mt-2">
+          <p class="text-xs form-hint mt-2">
             提示：价格用于计算对话消耗成本，设置为0表示不计算费用
           </p>
         </div>
 
         <!-- 测试结果 -->
-        <div v-if="testResult" class="p-3 rounded-lg" :class="testResult.success ? 'bg-green-50' : 'bg-red-50'">
+        <div v-if="testResult" class="p-3 rounded-lg" :class="testResult.success ? 'test-success' : 'test-error'">
           <div class="flex items-center gap-2">
-            <CheckCircle v-if="testResult.success" class="w-4 h-4 text-green-500" />
-            <XCircle v-else class="w-4 h-4 text-red-500" />
-            <span :class="testResult.success ? 'text-green-700' : 'text-red-700'">
+            <CheckCircle v-if="testResult.success" class="w-4 h-4" />
+            <XCircle v-else class="w-4 h-4" />
+            <span>
               {{ testResult.message }}
             </span>
           </div>
@@ -675,12 +671,12 @@ onMounted(() => {
       <template #footer>
         <div class="flex justify-between">
           <button
-            class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+            class="px-4 py-2 test-btn transition-colors disabled:opacity-50"
             :disabled="testLoading"
             @click="handleTest"
           >
             <span v-if="testLoading" class="flex items-center gap-2">
-              <span class="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></span>
+              <span class="w-4 h-4 border-2 rounded-full animate-spin"></span>
               测试中...
             </span>
             <span v-else class="flex items-center gap-1">
@@ -690,13 +686,13 @@ onMounted(() => {
           </button>
           <div class="flex gap-3">
             <button
-              class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              class="px-4 py-2 cancel-btn rounded-lg transition-colors"
               @click="showModal = false"
             >
               取消
             </button>
             <button
-              class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+              class="px-4 py-2 primary-btn text-white rounded-lg transition-colors disabled:opacity-50"
               :disabled="saveLoading"
               @click="handleSave"
             >
@@ -719,3 +715,166 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* 主题适配样式 */
+.ai-model-page {
+  background-color: var(--color-bg-layout);
+}
+
+.page-title {
+  color: var(--color-text-primary);
+}
+
+.page-desc {
+  color: var(--color-text-secondary);
+}
+
+.primary-btn {
+  background-color: var(--color-primary);
+}
+
+.primary-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.loading-text {
+  color: var(--color-text-secondary);
+}
+
+.empty-card {
+  background-color: var(--color-bg-container);
+}
+
+.empty-icon {
+  color: var(--color-text-placeholder);
+}
+
+.empty-text {
+  color: var(--color-text-secondary);
+}
+
+.model-card {
+  background-color: var(--color-bg-container);
+}
+
+.model-default {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.default-tag {
+  background-color: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.card-title {
+  color: var(--color-text-primary);
+}
+
+.card-desc {
+  color: var(--color-text-secondary);
+}
+
+.enabled-tag {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.disabled-tag {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-placeholder);
+}
+
+.card-divider {
+  border-top: 1px solid var(--color-border);
+}
+
+.action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.action-btn:hover {
+  color: var(--color-primary);
+  background-color: var(--color-bg-active);
+}
+
+.delete-action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.delete-action-btn:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-bg);
+}
+
+.star-action-btn {
+  color: var(--color-text-placeholder);
+}
+
+.star-action-btn:hover {
+  color: #eab308;
+  background-color: rgba(234, 179, 8, 0.1);
+}
+
+.enabled-action-btn {
+  color: #22c55e;
+}
+
+.enabled-action-btn:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.form-label {
+  color: var(--color-text-primary);
+}
+
+.form-input {
+  background-color: var(--color-bg-container);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.form-hint {
+  color: var(--color-text-placeholder);
+}
+
+.form-divider {
+  border-color: var(--color-border);
+}
+
+.quick-select-btn {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.quick-select-btn:hover {
+  background-color: var(--color-border);
+}
+
+.test-success {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.test-error {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.test-btn {
+  color: var(--color-text-secondary);
+}
+
+.test-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.cancel-btn {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-active);
+}
+
+.cancel-btn:hover {
+  background-color: var(--color-border);
+}
+</style>
