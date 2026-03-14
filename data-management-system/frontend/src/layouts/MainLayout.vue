@@ -2,10 +2,10 @@
  * 主布局组件
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Home,
@@ -17,10 +17,15 @@ import {
   Menu as MenuIcon,
   X,
   BookOpen,
+  Settings,
+  LogOut,
+  User,
 } from 'lucide-vue-next'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const collapsed = ref(false)
 
 // 菜单配置
@@ -51,6 +56,30 @@ const toggleCollapsed = () => {
 const handleMenuClick = (key: string) => {
   router.push(key)
 }
+
+// 用户下拉菜单选项
+const userMenuOptions = [
+  { content: '个人设置', value: 'settings', icon: Settings },
+  { content: '退出登录', value: 'logout', icon: LogOut },
+]
+
+// 处理用户菜单点击
+const handleUserMenuClick = (value: string) => {
+  if (value === 'logout') {
+    userStore.logout()
+    router.push('/login')
+  } else if (value === 'settings') {
+    // TODO: 跳转到个人设置页面
+    router.push('/settings')
+  }
+}
+
+// 初始化获取用户信息
+onMounted(() => {
+  if (userStore.token && !userStore.userInfo) {
+    userStore.fetchUserInfo()
+  }
+})
 </script>
 
 <template>
@@ -99,6 +128,37 @@ const handleMenuClick = (key: string) => {
           </li>
         </ul>
       </nav>
+
+      <!-- 用户信息区域 -->
+      <div class="p-3 border-t border-gray-100">
+        <t-dropdown
+          :options="userMenuOptions"
+          @click="handleUserMenuClick"
+          placement="top"
+        >
+          <div
+            class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <div class="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0 overflow-hidden">
+              <img
+                v-if="userStore.avatar"
+                :src="userStore.avatar"
+                :alt="userStore.nickname"
+                class="w-full h-full object-cover"
+              />
+              <User v-else class="w-full h-full p-1.5 text-gray-500" />
+            </div>
+            <div v-if="!collapsed" class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-800 truncate">
+                {{ userStore.nickname || '未登录' }}
+              </p>
+              <p class="text-xs text-gray-500 truncate">
+                {{ userStore.userInfo?.email || '' }}
+              </p>
+            </div>
+          </div>
+        </t-dropdown>
+      </div>
 
       <!-- 折叠按钮 -->
       <div class="p-3 border-t border-gray-100">

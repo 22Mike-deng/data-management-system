@@ -1,0 +1,82 @@
+/**
+ * 用户状态管理
+ * 创建者：dzh
+ * 创建时间：2026-03-13
+ * 更新时间：2026-03-13
+ */
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import type { UserInfo } from '@/types/auth'
+import * as authApi from '@/api/auth'
+
+export const useUserStore = defineStore('user', () => {
+  // 用户信息
+  const userInfo = ref<UserInfo | null>(null)
+  
+  // Token
+  const token = ref<string | null>(localStorage.getItem('token'))
+
+  // 是否已登录
+  const isLoggedIn = computed(() => !!token.value)
+
+  // 用户名
+  const username = computed(() => userInfo.value?.username || '')
+
+  // 昵称
+  const nickname = computed(() => userInfo.value?.nickname || userInfo.value?.username || '')
+
+  // 头像
+  const avatar = computed(() => userInfo.value?.avatar || '')
+
+  /**
+   * 登录
+   */
+  async function login(username: string, password: string): Promise<void> {
+    const res = await authApi.login({ username, password })
+    token.value = res.token
+    userInfo.value = res.user
+    localStorage.setItem('token', res.token)
+  }
+
+  /**
+   * 获取用户信息
+   */
+  async function fetchUserInfo(): Promise<void> {
+    if (!token.value) return
+    try {
+      const user = await authApi.getUserInfo()
+      userInfo.value = user
+    } catch {
+      logout()
+    }
+  }
+
+  /**
+   * 登出
+   */
+  function logout(): void {
+    token.value = null
+    userInfo.value = null
+    localStorage.removeItem('token')
+  }
+
+  /**
+   * 修改密码
+   */
+  async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await authApi.changePassword({ oldPassword, newPassword })
+  }
+
+  return {
+    userInfo,
+    token,
+    isLoggedIn,
+    username,
+    nickname,
+    avatar,
+    login,
+    logout,
+    fetchUserInfo,
+    changePassword,
+  }
+})

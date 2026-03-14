@@ -2,11 +2,17 @@
  * 路由配置
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/login/index.vue'),
+    meta: { title: '登录', requiresAuth: false },
+  },
   {
     path: '/',
     name: 'Layout',
@@ -61,6 +67,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/token-stats/index.vue'),
         meta: { title: 'Token统计', icon: 'chart-line' },
       },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/settings/index.vue'),
+        meta: { title: '个人设置', icon: 'settings', hidden: true },
+      },
     ],
   },
   {
@@ -76,9 +88,31 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // 设置页面标题
   document.title = `${to.meta.title || '数据管理系统'} - 数据管理可视化系统`
+
+  // 检查是否需要认证
+  const requiresAuth = to.meta.requiresAuth !== false
+  const token = localStorage.getItem('token')
+
+  // 如果不需要认证（如登录页），直接放行
+  if (!requiresAuth) {
+    // 已登录用户访问登录页，重定向到首页
+    if (to.path === '/login' && token) {
+      next('/')
+      return
+    }
+    next()
+    return
+  }
+
+  // 需要认证但没有 token，跳转登录页
+  if (!token) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+
   next()
 })
 

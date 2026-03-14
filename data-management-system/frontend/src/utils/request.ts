@@ -2,7 +2,7 @@
  * Axios 请求封装
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-13
  */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ApiResponse } from '@/types'
@@ -19,7 +19,11 @@ const service: AxiosInstance = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    // 可在此添加token等认证信息
+    // 添加 token 认证信息
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   (error) => {
@@ -39,6 +43,14 @@ service.interceptors.response.use(
     return response
   },
   (error) => {
+    // 处理 401 未授权错误
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      // 跳转到登录页面
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
     // 输出详细错误信息
     if (error.response) {
       console.error('响应错误：', {
