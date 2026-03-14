@@ -4,6 +4,10 @@
 
 > **本项目由 [CodeBuddy CN](https://www.codebuddy.cn/home/) AI编程助手全程辅助开发。** CodeBuddy CN 是一款强大的AI编程工具，支持代码生成、智能重构、Bug修复等功能，大幅提升开发效率。
 
+## 系统预览
+
+![系统预览图](data-management-system/image/image1.png)
+
 ## 技术栈
 
 | 层级 | 技术 | 说明 |
@@ -13,6 +17,7 @@
 | 样式方案 | TailwindCSS + Less | 原子化CSS + 预处理器 |
 | 图表可视化 | ECharts | 丰富的图表类型 |
 | 图标库 | Lucide Vue Next | 现代化图标库 |
+| 桌面客户端 | Electron 28 | 跨平台桌面应用 |
 | 后端框架 | NestJS (Node.js) | TypeScript全栈统一 |
 | 数据库 | MySQL + TypeORM | 支持JSON字段，动态建表 |
 | 缓存 | Redis + ioredis | 数据缓存，验证码存储 |
@@ -20,11 +25,20 @@
 | 认证 | JWT + Passport | 用户认证与授权 |
 | 邮件 | Nodemailer | 邮箱验证码登录 |
 
+## 运行模式
+
+本系统支持两种运行模式：
+
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| **Web模式** | 浏览器访问，前后端分离部署 | 团队协作、云端部署 |
+| **桌面模式** | Electron桌面客户端 | 个人使用、本地数据管理 |
+
 ## 项目结构
 
 ```
 data-management-system/
-├── frontend/                    # 前端项目
+├── frontend/                    # 前端项目 (Vue 3 + Vite)
 │   ├── src/
 │   │   ├── api/                # API接口封装
 │   │   │   ├── ai-model.ts     # AI模型管理接口
@@ -54,7 +68,7 @@ data-management-system/
 │   │   ├── types/              # 类型定义
 │   │   └── utils/              # 工具函数
 │   └── package.json
-├── backend/                     # 后端项目
+├── backend/                     # 后端项目 (NestJS)
 │   ├── src/
 │   │   ├── modules/            # 业务模块
 │   │   │   ├── ai-model/       # AI模型管理（模型配置、对话、工具调用）
@@ -71,7 +85,13 @@ data-management-system/
 │   │   ├── database/           # 数据库配置与实体
 │   │   └── main.ts             # 入口文件
 │   └── package.json
+├── desktop/                     # Electron桌面客户端
+│   ├── main.js                 # 主进程入口
+│   ├── preload.js              # 预加载脚本
+│   ├── .npmrc                  # npm镜像配置
+│   └── package.json
 ├── dump.rdb                     # Redis数据快照
+├── package.json                 # 根项目配置
 └── README.md
 ```
 
@@ -79,27 +99,76 @@ data-management-system/
 
 ### 环境要求
 
-- Node.js >= 18
-- MySQL >= 8.0
-- Redis >= 6.0
-- npm >= 9
+| 软件 | 版本要求 | 说明 |
+|------|---------|------|
+| Node.js | >= 18.0.0 | 推荐 20.x LTS |
+| MySQL | >= 8.0 | 数据库 |
+| Redis | >= 6.0 | 缓存服务 |
+| npm | >= 9.0 | 包管理器 |
+
+### 安装依赖
+
+```bash
+# 一键安装所有依赖
+cd data-management-system
+npm run install:all
+
+# 或分别安装
+cd data-management-system/backend && npm install
+cd ../frontend && npm install
+cd ../desktop && npm install
+```
 
 ### 后端启动
 
 ```bash
 cd data-management-system/backend
-npm install
 cp .env.example .env
 # 编辑 .env 配置数据库连接信息
 npm run start:dev
 ```
 
-### 前端启动
+### 前端启动（Web模式）
 
 ```bash
-cd data-management-system/frontend
-npm install
+cd data-management-system
 npm run dev
+# 或
+cd frontend && npm run dev
+```
+
+### Electron桌面客户端启动
+
+**国内用户**：首次安装需要配置 Electron 镜像，在 `desktop` 目录创建 `.npmrc` 文件：
+
+```
+electron_mirror=https://npmmirror.com/mirrors/electron/
+```
+
+**启动开发模式**：
+
+```bash
+# 终端1：启动后端服务
+cd data-management-system/backend
+npm run start:dev
+
+# 终端2：启动Electron客户端
+cd data-management-system
+npm run dev:electron
+```
+
+**打包桌面应用**：
+
+```bash
+# 打包 Windows 版本
+cd data-management-system
+npm run build:electron
+
+# 或进入 desktop 目录单独打包
+cd desktop
+npm run build:win    # Windows
+npm run build:mac    # macOS
+npm run build:linux  # Linux
 ```
 
 ### 初始化管理员账号
@@ -244,6 +313,19 @@ EMAIL_FROM=your_email@example.com
 ## 作者
 
 dzh
+
+## 更新日志
+
+### v1.0.1 (2026-03-14)
+- 新增 Electron 桌面客户端支持
+- 支持 Windows/macOS/Linux 跨平台打包
+- 优化国内镜像配置
+
+### v1.0.0
+- 动态建表功能
+- AI智能对话
+- 数据可视化
+- Token消耗统计
 
 ## 许可证
 
