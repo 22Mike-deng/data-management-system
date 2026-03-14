@@ -17,18 +17,19 @@ export class AuthController {
    * 用户登录
    * POST /api/auth/login
    * 【安全修复】登录接口限流：每分钟最多5次尝试
+   * 支持用户名或邮箱登录
    */
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   async login(
-    @Body() body: { username: string; password: string },
+    @Body() body: { account: string; password: string },
     @Req() req: any,
   ) {
     // 获取真实IP（支持代理场景）
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() 
       || req.ip 
       || req.connection.remoteAddress;
-    const result = await this.authService.login(body.username, body.password, ip);
+    const result = await this.authService.login(body.account, body.password, ip);
     return {
       code: 0,
       message: '登录成功',
@@ -90,6 +91,44 @@ export class AuthController {
     return {
       code: 0,
       message: '密码修改成功',
+    };
+  }
+
+  /**
+   * 发送邮箱验证码
+   * POST /api/auth/send-code
+   * 【安全修复】验证码接口限流：每分钟最多1次，防止滥用
+   */
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @Post('send-code')
+  async sendEmailCode(@Body() body: { email: string }) {
+    await this.authService.sendEmailCode(body.email);
+    return {
+      code: 0,
+      message: '验证码已发送',
+    };
+  }
+
+  /**
+   * 邮箱验证码登录
+   * POST /api/auth/login-by-code
+   * 【安全修复】验证码登录接口限流：每分钟最多5次尝试
+   */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('login-by-code')
+  async loginByEmailCode(
+    @Body() body: { email: string; code: string },
+    @Req() req: any,
+  ) {
+    // 获取真实IP（支持代理场景）
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() 
+      || req.ip 
+      || req.connection.remoteAddress;
+    const result = await this.authService.loginByEmailCode(body.email, body.code, ip);
+    return {
+      code: 0,
+      message: '登录成功',
+      data: result,
     };
   }
 }

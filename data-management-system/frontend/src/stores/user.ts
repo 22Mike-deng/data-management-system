@@ -29,13 +29,30 @@ export const useUserStore = defineStore('user', () => {
   const avatar = computed(() => userInfo.value?.avatar || '')
 
   /**
-   * 登录
+   * 登录（支持用户名或邮箱密码登录）
    */
-  async function login(username: string, password: string): Promise<void> {
-    const res = await authApi.login({ username, password })
+  async function login(account: string, password: string): Promise<void> {
+    const res = await authApi.login({ account, password })
     token.value = res.token
     userInfo.value = res.user
     localStorage.setItem('token', res.token)
+  }
+
+  /**
+   * 邮箱验证码登录
+   */
+  async function loginByCode(email: string, code: string): Promise<void> {
+    const res = await authApi.loginByCode({ email, code })
+    token.value = res.token
+    userInfo.value = res.user
+    localStorage.setItem('token', res.token)
+  }
+
+  /**
+   * 发送邮箱验证码
+   */
+  async function sendEmailCode(email: string): Promise<void> {
+    await authApi.sendEmailCode({ email })
   }
 
   /**
@@ -84,6 +101,8 @@ export const useUserStore = defineStore('user', () => {
     nickname,
     avatar,
     login,
+    loginByCode,
+    sendEmailCode,
     logout,
     fetchUserInfo,
     changePassword,

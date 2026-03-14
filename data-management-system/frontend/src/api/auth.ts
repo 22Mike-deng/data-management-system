@@ -5,13 +5,28 @@
  * 更新时间：2026-03-14
  */
 import request from '@/utils/request'
-import type { LoginRequest, LoginResponse, UserInfo, ChangePasswordRequest } from '@/types/auth'
+import type { LoginRequest, LoginResponse, UserInfo, ChangePasswordRequest, SendCodeRequest, LoginByCodeRequest } from '@/types/auth'
 
 /**
- * 用户登录
+ * 用户登录（密码登录）
  */
 export async function login(data: LoginRequest): Promise<LoginResponse> {
   const res = await request.post<LoginResponse>('/auth/login', data)
+  return res.data
+}
+
+/**
+ * 发送邮箱验证码
+ */
+export async function sendEmailCode(data: SendCodeRequest): Promise<void> {
+  await request.post('/auth/send-code', data)
+}
+
+/**
+ * 邮箱验证码登录
+ */
+export async function loginByCode(data: LoginByCodeRequest): Promise<LoginResponse> {
+  const res = await request.post<LoginResponse>('/auth/login-by-code', data)
   return res.data
 }
 

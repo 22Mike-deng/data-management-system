@@ -4,7 +4,7 @@
  * 创建时间：2026-03-13
  * 更新时间：2026-03-14
  */
-import { Injectable, UnauthorizedException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,44 +12,60 @@ import * as bcrypt from 'bcryptjs';
 import { SysUser } from '../../database/entities/sys-user.entity';
 import { validatePassword } from '../../common/utils/password.util';
 import { RedisCacheService } from '../redis-cache';
+import { MailService } from '../mail';
 
 // Token 黑名单缓存键前缀
 const TOKEN_BLACKLIST_PREFIX = 'token_blacklist';
+// 邮箱验证码缓存键前缀
+const EMAIL_CODE_PREFIX = 'email_code';
+// 验证码有效期（秒）
+const CODE_EXPIRE_SECONDS = 600; // 10分钟
+// 验证码长度
+const CODE_LENGTH = 6;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(SysUser)
     private userRepository: Repository<SysUser>,
     private jwtService: JwtService,
     private cacheService: RedisCacheService,
+    private mailService: MailService,
   ) {}
 
   /**
    * 用户登录验证
-   * @param username 用户名
+   * 支持用户名或邮箱登录
+   * @param account 用户名或邮箱
    * @param password 密码
    * @param ip 登录IP
    * @returns JWT令牌和用户信息
    */
   async login(
-    username: string,
+    account: string,
     password: string,
     ip: string,
   ): Promise<{ token: string; user: Partial<SysUser> }> {
-    // 查找用户
+    // 判断是邮箱还是用户名
+    const isEmail = account.includes('@');
+    
+    // 根据登录方式查找用户
     const user = await this.userRepository.findOne({
-      where: { username },
+      where: isEmail 
+        ? { email: account } 
+        : { username: account },
     });
 
     if (!user) {
-      throw new UnauthorizedException('用户名或密码错误');
+      throw new UnauthorizedException(isEmail ? '邮箱或密码错误' : '用户名或密码错误');
     }
 
     // 验证密码
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('用户名或密码错误');
+      throw new UnauthorizedException(isEmail ? '邮箱或密码错误' : '用户名或密码错误');
     }
 
     // 检查用户状态
@@ -189,5 +205,99 @@ export class AuthService {
     await this.userRepository.update(userId, {
       password: hashedPassword,
     });
+  }
+
+  /**
+   * 发送邮箱验证码
+   * @param email 邮箱地址
+   */
+  async sendEmailCode(email: string): Promise<void> {
+    // 检查邮箱是否已注册
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('该邮箱未注册');
+    }
+
+    if (user.status !== 0) {
+      throw new BadRequestException('该账号已被禁用');
+    }
+
+    // 生成6位随机验证码
+    const code = Math.random().toString().slice(-CODE_LENGTH).padStart(CODE_LENGTH, '0');
+
+    // 存储验证码到Redis（10分钟有效）
+    const cacheKey = RedisCacheService.buildKey(EMAIL_CODE_PREFIX, email);
+    await this.cacheService.set(cacheKey, code, CODE_EXPIRE_SECONDS);
+
+    // 发送验证码邮件
+    const result = await this.mailService.sendVerificationCode(email, code, CODE_EXPIRE_SECONDS / 60);
+    
+    if (!result.success) {
+      this.logger.error(`发送验证码失败: ${result.error}`);
+      throw new BadRequestException('验证码发送失败，请稍后重试');
+    }
+
+    this.logger.log(`验证码已发送至: ${email}`);
+  }
+
+  /**
+   * 邮箱验证码登录
+   * @param email 邮箱地址
+   * @param code 验证码
+   * @param ip 登录IP
+   * @returns JWT令牌和用户信息
+   */
+  async loginByEmailCode(
+    email: string,
+    code: string,
+    ip: string,
+  ): Promise<{ token: string; user: Partial<SysUser> }> {
+    // 验证验证码
+    const cacheKey = RedisCacheService.buildKey(EMAIL_CODE_PREFIX, email);
+    const storedCode = await this.cacheService.get<string>(cacheKey);
+
+    if (!storedCode || storedCode !== code) {
+      throw new UnauthorizedException('验证码错误或已过期');
+    }
+
+    // 验证成功后删除验证码（一次性使用）
+    await this.cacheService.del(cacheKey);
+
+    // 查找用户
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    if (user.status !== 0) {
+      throw new UnauthorizedException('账号已被禁用');
+    }
+
+    // 更新最后登录信息
+    await this.userRepository.update(user.id, {
+      lastLoginAt: new Date(),
+      lastLoginIp: ip,
+    });
+
+    // 生成JWT令牌
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+    };
+    const token = this.jwtService.sign(payload);
+
+    // 返回用户信息（不包含密码）
+    const { password: _, ...userInfo } = user;
+    return {
+      token,
+      user: userInfo,
+    };
   }
 }
