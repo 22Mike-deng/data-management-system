@@ -169,7 +169,7 @@
 
       <!-- 底部提示 -->
       <div class="footer-note">
-        <p>面向管理的系统，暂不开放注册</p>
+        <p>面向管理的数据管理系统</p>
       </div>
     </div>
   </div>
@@ -311,13 +311,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 容器 */
+/* 容器 - 浅蓝白色主题 */
 .login-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d0d1f 100%);
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 50%, #f5faff 100%);
   position: relative;
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -335,32 +335,32 @@ onUnmounted(() => {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.4;
+  opacity: 0.5;
   animation: float 20s ease-in-out infinite;
 }
 
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
   top: -100px;
-  left: -100px;
+  right: -100px;
   animation-delay: 0s;
 }
 
 .orb-2 {
   width: 300px;
   height: 300px;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  background: linear-gradient(135deg, #93c5fd, #60a5fa);
   bottom: -50px;
-  right: -50px;
+  left: -50px;
   animation-delay: -7s;
 }
 
 .orb-3 {
-  width: 200px;
-  height: 200px;
-  background: linear-gradient(135deg, #ec4899, #f43f5e);
+  width: 250px;
+  height: 250px;
+  background: linear-gradient(135deg, #bfdbfe, #93c5fd);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -386,23 +386,24 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
 }
 
-/* 登录卡片 */
+/* 登录卡片 - 玻璃拟态 */
 .login-card {
   width: 100%;
   max-width: 420px;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 
-    0 25px 50px -12px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 8px 32px rgba(59, 130, 246, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   position: relative;
   z-index: 1;
   animation: cardEnter 0.6s ease-out;
@@ -429,36 +430,36 @@ onUnmounted(() => {
   width: 64px;
   height: 64px;
   margin: 0 auto 16px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
   animation: iconPulse 2s ease-in-out infinite;
 }
 
 @keyframes iconPulse {
   0%, 100% {
-    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
   }
   50% {
-    box-shadow: 0 8px 48px rgba(99, 102, 241, 0.6);
+    box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
   }
 }
 
 .title {
   font-size: 24px;
   font-weight: 700;
-  color: #ffffff;
+  color: #1e293b;
   margin: 0 0 4px;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #64748b;
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -469,7 +470,7 @@ onUnmounted(() => {
 .tab-switcher {
   display: flex;
   position: relative;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(59, 130, 246, 0.08);
   border-radius: 12px;
   padding: 4px;
   margin-bottom: 28px;
@@ -484,7 +485,7 @@ onUnmounted(() => {
   padding: 12px 16px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: #64748b;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -494,7 +495,7 @@ onUnmounted(() => {
 }
 
 .tab-btn:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: #3b82f6;
 }
 
 .tab-btn.active {
@@ -507,9 +508,10 @@ onUnmounted(() => {
   left: 4px;
   width: calc(50% - 4px);
   height: calc(100% - 8px);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
   border-radius: 10px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .tab-indicator.to-right {
@@ -548,41 +550,42 @@ onUnmounted(() => {
   transform: translateX(-10px);
 }
 
-/* 输入框样式覆盖 */
+/* 输入框样式覆盖 - 浅色主题 */
 .login-card :deep(.t-form-item) {
   margin-bottom: 20px;
 }
 
 .login-card :deep(.t-input) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(59, 130, 246, 0.15) !important;
   border-radius: 12px !important;
   transition: all 0.3s ease;
 }
 
 .login-card :deep(.t-input:hover) {
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
 }
 
 .login-card :deep(.t-input:focus-within) {
-  border-color: rgba(99, 102, 241, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  background: #ffffff !important;
 }
 
 .login-card :deep(.t-input__inner) {
-  color: #ffffff !important;
+  color: #1e293b !important;
   font-size: 15px !important;
 }
 
 .login-card :deep(.t-input__inner::placeholder) {
-  color: rgba(255, 255, 255, 0.3) !important;
+  color: #94a3b8 !important;
 }
 
 .input-icon {
   width: 20px;
   height: 20px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #94a3b8;
 }
 
 /* 验证码输入组 */
@@ -598,40 +601,42 @@ onUnmounted(() => {
 .code-btn {
   flex-shrink: 0;
   min-width: 110px;
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
   border-radius: 12px !important;
-  color: rgba(255, 255, 255, 0.8) !important;
+  color: #3b82f6 !important;
   font-weight: 500;
   transition: all 0.3s ease;
 }
 
 .code-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
 }
 
 .code-btn:disabled {
   opacity: 0.5;
+  color: #94a3b8 !important;
 }
 
 /* 提交按钮 */
 .submit-btn {
   margin-top: 8px;
   height: 48px !important;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
   border: none !important;
   border-radius: 12px !important;
   font-size: 16px !important;
   font-weight: 600 !important;
   letter-spacing: 0.05em;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
 }
 
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);
 }
 
 .submit-btn:active {
@@ -646,13 +651,13 @@ onUnmounted(() => {
 
 .footer-note p {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.3);
+  color: #94a3b8;
   margin: 0;
 }
 
 /* 错误提示样式 */
 .login-card :deep(.t-form__msg) {
-  color: #f87171 !important;
+  color: #ef4444 !important;
   font-size: 12px !important;
 }
 </style>
