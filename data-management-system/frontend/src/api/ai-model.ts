@@ -97,10 +97,13 @@ export function streamMessage(
   ;(async () => {
     try {
       const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+      // 获取 token 添加到请求头
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE}/ai/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(data),
         signal: controller.signal,
