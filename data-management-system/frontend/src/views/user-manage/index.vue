@@ -61,6 +61,9 @@
             {{ row.status === 0 ? '正常' : '禁用' }}
           </t-tag>
         </template>
+        <template #lastLoginAt="{ row }">
+          {{ formatDate(row.lastLoginAt) }}
+        </template>
         <template #createdAt="{ row }">
           {{ formatDate(row.createdAt) }}
         </template>
@@ -195,7 +198,7 @@ const columns = [
   { colKey: 'nickname', title: '昵称', width: 120 },
   { colKey: 'email', title: '邮箱', width: 200 },
   { colKey: 'status', title: '状态', width: 80, cell: 'status' },
-  { colKey: 'lastLoginAt', title: '最后登录', width: 160 },
+  { colKey: 'lastLoginAt', title: '最后登录', width: 160, cell: 'lastLoginAt' },
   { colKey: 'createdAt', title: '创建时间', width: 160, cell: 'createdAt' },
   { colKey: 'operation', title: '操作', width: 200, cell: 'operation', fixed: 'right' },
 ]
