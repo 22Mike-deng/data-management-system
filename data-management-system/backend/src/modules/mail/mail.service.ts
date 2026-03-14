@@ -52,7 +52,7 @@ export class MailService {
   private initTransporter() {
     const host = this.configService.get<string>('SMTP_HOST');
     const port = this.configService.get<number>('SMTP_PORT');
-    const secure = this.configService.get<boolean>('SMTP_SECURE');
+    const secure = this.configService.get<string>('SMTP_SECURE') === 'true';
     const user = this.configService.get<string>('SMTP_USER');
     const pass = this.configService.get<string>('SMTP_PASS');
 
@@ -60,13 +60,16 @@ export class MailService {
     if (!host || !port || !user || !pass) {
       this.logger.warn('⚠️ 邮件服务配置不完整，邮件发送功能将不可用');
       this.logger.warn('请在 .env 文件中配置 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
+      this.logger.warn(`当前配置: host=${host}, port=${port}, user=${user}, pass=${pass ? '已设置' : '未设置'}`);
       return;
     }
+
+    this.logger.log(`📧 正在配置邮件服务: ${host}:${port}, secure=${secure}, user=${user}`);
 
     this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: secure !== false, // 默认启用SSL
+      secure, // 163邮箱使用465端口时需要设置为true
       auth: {
         user,
         pass,
@@ -74,9 +77,12 @@ export class MailService {
       // 连接超时设置
       connectionTimeout: 10000,
       socketTimeout: 10000,
+      // 调试模式（开发环境）
+      debug: process.env.NODE_ENV === 'development',
+      logger: process.env.NODE_ENV === 'development',
     });
 
-    this.logger.log('✅ 邮件服务初始化成功');
+    this.logger.log('✅ 邮件传输器创建成功');
   }
 
   /**
@@ -89,11 +95,12 @@ export class MailService {
     }
 
     try {
-      await this.transporter.verify();
+      const result = await this.transporter.verify();
       this.logger.log('✅ 邮件服务连接验证成功');
-      return true;
-    } catch (error) {
+      return result;
+    } catch (error: any) {
       this.logger.error(`❌ 邮件服务连接验证失败: ${error.message}`);
+      this.logger.error(`错误详情: ${JSON.stringify(error)}`);
       return false;
     }
   }

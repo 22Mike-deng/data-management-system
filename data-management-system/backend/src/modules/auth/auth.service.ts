@@ -212,35 +212,55 @@ export class AuthService {
    * @param email 邮箱地址
    */
   async sendEmailCode(email: string): Promise<void> {
+    this.logger.log(`开始发送验证码到邮箱: ${email}`);
+
     // 检查邮箱是否已注册
     const user = await this.userRepository.findOne({
       where: { email },
     });
 
     if (!user) {
+      this.logger.warn(`邮箱未注册: ${email}`);
       throw new BadRequestException('该邮箱未注册');
     }
 
     if (user.status !== 0) {
+      this.logger.warn(`账号已被禁用: ${email}`);
       throw new BadRequestException('该账号已被禁用');
     }
 
     // 生成6位随机验证码
     const code = Math.random().toString().slice(-CODE_LENGTH).padStart(CODE_LENGTH, '0');
+    this.logger.log(`生成验证码: ${code}，有效期: ${CODE_EXPIRE_SECONDS}秒`);
 
     // 存储验证码到Redis（10分钟有效）
-    const cacheKey = RedisCacheService.buildKey(EMAIL_CODE_PREFIX, email);
-    await this.cacheService.set(cacheKey, code, CODE_EXPIRE_SECONDS);
+    try {
+      const cacheKey = RedisCacheService.buildKey(EMAIL_CODE_PREFIX, email);
+      await this.cacheService.set(cacheKey, code, CODE_EXPIRE_SECONDS);
+      this.logger.log(`验证码已存入Redis: ${cacheKey}`);
+    } catch (redisError) {
+      this.logger.error(`Redis存储失败: ${redisError.message}`);
+      throw new BadRequestException('验证码存储失败，请稍后重试');
+    }
 
     // 发送验证码邮件
+    this.logger.log(`开始发送邮件到: ${email}`);
     const result = await this.mailService.sendVerificationCode(email, code, CODE_EXPIRE_SECONDS / 60);
     
     if (!result.success) {
       this.logger.error(`发送验证码失败: ${result.error}`);
-      throw new BadRequestException('验证码发送失败，请稍后重试');
+      throw new BadRequestException(`验证码发送失败: ${result.error || '请检查邮件配置'}`);
     }
 
     this.logger.log(`验证码已发送至: ${email}`);
+  }
+
+  /**
+   * 测试邮件服务配置
+   * @returns 邮件服务是否配置正常
+   */
+  async testMailConfiguration(): Promise<boolean> {
+    return this.mailService.verify();
   }
 
   /**

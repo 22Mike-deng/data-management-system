@@ -249,7 +249,8 @@ async function handleSendCode() {
   sendingCode.value = true
   try {
     await userStore.sendEmailCode(codeForm.email)
-    MessagePlugin.success('验证码已发送，请查收邮件')
+    // 使用 nextTick 确保消息正确显示
+    MessagePlugin.success('验证码已发送，请查收邮件', 3000)
     countdown.value = 60
     countdownTimer = setInterval(() => {
       countdown.value--
@@ -259,7 +260,16 @@ async function handleSendCode() {
       }
     }, 1000)
   } catch (error: any) {
-    MessagePlugin.error(error.response?.data?.message || '验证码发送失败')
+    const status = error.response?.status
+    const message = error.response?.data?.message || '验证码发送失败'
+    
+    // 限流提示
+    if (status === 429) {
+      MessagePlugin.error('发送太频繁，请60秒后再试')
+    } else {
+      MessagePlugin.error(message)
+    }
+    console.error('发送验证码失败:', error.response?.data || error)
   } finally {
     sendingCode.value = false
   }

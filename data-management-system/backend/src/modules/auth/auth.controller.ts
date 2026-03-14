@@ -97,15 +97,30 @@ export class AuthController {
   /**
    * 发送邮箱验证码
    * POST /api/auth/send-code
-   * 【安全修复】验证码接口限流：每分钟最多1次，防止滥用
+   * 【安全修复】验证码接口限流：每分钟最多3次，防止滥用
    */
-  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('send-code')
   async sendEmailCode(@Body() body: { email: string }) {
     await this.authService.sendEmailCode(body.email);
     return {
       code: 0,
       message: '验证码已发送',
+    };
+  }
+
+  /**
+   * 测试邮件服务配置
+   * POST /api/auth/test-mail
+   * 【开发调试用】测试邮件服务是否正常
+   */
+  @Post('test-mail')
+  async testMail() {
+    const isConfigured = await this.authService.testMailConfiguration();
+    return {
+      code: 0,
+      message: isConfigured ? '邮件服务配置正常' : '邮件服务配置异常',
+      data: { configured: isConfigured },
     };
   }
 
