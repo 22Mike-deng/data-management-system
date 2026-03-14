@@ -229,7 +229,7 @@ export class AIChatService {
   /**
    * 发送消息并获取AI回复
    */
-  async sendMessage(dto: SendMessageDto): Promise<{ reply: string; thinking?: string; sessionId: string; tokens: { input: number; output: number }; toolCalls?: any[] }> {
+  async sendMessage(dto: SendMessageDto, userId?: string): Promise<{ reply: string; thinking?: string; sessionId: string; tokens: { input: number; output: number }; toolCalls?: any[] }> {
     // 获取使用的模型
     let model: AIModelConfig;
     if (dto.modelId) {
@@ -244,19 +244,20 @@ export class AIChatService {
     // 生成或使用现有会话ID
     const sessionId = dto.sessionId || uuidv4();
 
-    // 保存用户消息
+    // 保存用户消息（添加创建者ID）
     const userMessage = this.chatRepository.create({
       chatId: uuidv4(),
       modelId: model.modelId,
       sessionId,
       role: 'user',
       content: dto.content,
+      createdBy: userId,
     });
     await this.chatRepository.save(userMessage);
 
     // 获取历史消息作为上下文（根据模型配置的上下文长度，默认20条）
     const contextLength = model.parameters?.contextLength || 20;
-    const history = await this.getRecentMessages(sessionId, contextLength);
+    const history = await this.getRecentMessages(sessionId, contextLength, userId);
 
     // 根据是否开启思考模式选择不同的系统提示词
     // disabled: 关闭思考，使用简单提示词
@@ -288,7 +289,7 @@ export class AIChatService {
       finalContent = parsed.content;
     }
 
-    // 保存AI回复（包含思考步骤）
+    // 保存AI回复（包含思考步骤，添加创建者ID）
     const assistantMessage = this.chatRepository.create({
       chatId: uuidv4(),
       modelId: model.modelId,
@@ -296,6 +297,7 @@ export class AIChatService {
       role: 'assistant',
       content: finalContent,
       thinking: thinking,
+      createdBy: userId,
     });
     await this.chatRepository.save(assistantMessage);
 
@@ -342,12 +344,22 @@ export class AIChatService {
 
   /**
    * 获取对话历史
+   * 根据用户ID过滤，只显示当前用户的对话
    */
-  async getChatHistory(dto: GetChatHistoryDto) {
+  async getChatHistory(dto: GetChatHistoryDto, userId?: string) {
     const query = this.chatRepository.createQueryBuilder('chat');
 
+    // 根据用户ID过滤
+    if (userId) {
+      query.where('chat.createdBy = :userId', { userId });
+    }
+
     if (dto.sessionId) {
-      query.where('chat.sessionId = :sessionId', { sessionId: dto.sessionId });
+      if (userId) {
+        query.andWhere('chat.sessionId = :sessionId', { sessionId: dto.sessionId });
+      } else {
+        query.where('chat.sessionId = :sessionId', { sessionId: dto.sessionId });
+      }
     }
 
     query.orderBy('chat.createdAt', 'ASC');
@@ -361,10 +373,11 @@ export class AIChatService {
   /**
    * 获取会话列表
    * 【性能优化】使用子查询一次性获取模型名称，避免 N+1 查询
+   * 根据用户ID过滤，只显示当前用户的会话
    */
-  async getSessionList() {
+  async getSessionList(userId?: string) {
     // 使用子查询获取每个会话的模型信息，避免循环查询
-    const sessions = await this.chatRepository
+    const query = this.chatRepository
       .createQueryBuilder('chat')
       .select('chat.sessionId', 'sessionId')
       .addSelect('MIN(chat.createdAt)', 'createdAt')
@@ -376,15 +389,21 @@ export class AIChatService {
           subQuery
             .select('m.modelName')
             .from(AIModelConfig, 'm')
-            .innerJoin('ai_chat_history', 'ch', 'ch.modelId = m.id')
+            .innerJoin('sys_ai_chat', 'ch', 'ch.modelId = m.modelId')
             .where('ch.sessionId = chat.sessionId')
             .limit(1),
         'modelName',
       )
       .setParameters({ userRole: 'user' })
       .groupBy('chat.sessionId')
-      .orderBy('MAX(chat.createdAt)', 'DESC')
-      .getRawMany();
+      .orderBy('MAX(chat.createdAt)', 'DESC');
+
+    // 根据用户ID过滤
+    if (userId) {
+      query.where('chat.createdBy = :userId', { userId });
+    }
+
+    const sessions = await query.getRawMany();
 
     // 使用 firstMessage 作为显示内容
     sessions.forEach((session) => {
@@ -396,17 +415,29 @@ export class AIChatService {
 
   /**
    * 删除会话
+   * 根据用户ID过滤，确保只能删除自己的会话
    */
-  async deleteSession(sessionId: string): Promise<void> {
-    await this.chatRepository.delete({ sessionId });
+  async deleteSession(sessionId: string, userId?: string): Promise<void> {
+    const whereCondition: any = { sessionId };
+    // 如果有用户ID，确保只能删除自己的会话
+    if (userId) {
+      whereCondition.createdBy = userId;
+    }
+    await this.chatRepository.delete(whereCondition);
   }
 
   /**
    * 获取最近的消息
+   * 根据用户ID过滤
    */
-  private async getRecentMessages(sessionId: string, limit: number): Promise<{ role: string; content: string }[]> {
+  private async getRecentMessages(sessionId: string, limit: number, userId?: string): Promise<{ role: string; content: string }[]> {
+    const whereCondition: any = { sessionId };
+    // 根据用户ID过滤
+    if (userId) {
+      whereCondition.createdBy = userId;
+    }
     const messages = await this.chatRepository.find({
-      where: { sessionId },
+      where: whereCondition,
       order: { createdAt: 'DESC' },
       take: limit,
     });
@@ -758,11 +789,11 @@ export class AIChatService {
    * 流式发送消息（SSE）
    * 返回 Observable 用于 NestJS @Sse() 装饰器
    */
-  async streamMessage(dto: SendMessageDto): Promise<Observable<MessageEvent>> {
+  async streamMessage(dto: SendMessageDto, userId?: string): Promise<Observable<MessageEvent>> {
     const subject = new Subject<MessageEvent>();
 
     // 异步处理流式响应
-    this.processStreamMessage(dto, subject).catch((error) => {
+    this.processStreamMessage(dto, subject, userId).catch((error) => {
       subject.next({
         type: 'error',
         data: JSON.stringify({ message: error.message || '流式响应失败' }),
@@ -779,6 +810,7 @@ export class AIChatService {
   private async processStreamMessage(
     dto: SendMessageDto,
     subject: Subject<MessageEvent>,
+    userId?: string,
   ): Promise<void> {
     // 获取使用的模型
     let model: AIModelConfig;
@@ -800,13 +832,14 @@ export class AIChatService {
       data: JSON.stringify({ sessionId }),
     } as MessageEvent);
 
-    // 保存用户消息
+    // 保存用户消息（添加创建者ID）
     const userMessage = this.chatRepository.create({
       chatId: uuidv4(),
       modelId: model.modelId,
       sessionId,
       role: 'user',
       content: dto.content,
+      createdBy: userId,
     });
     await this.chatRepository.save(userMessage);
     // 保存用户消息的实际创建时间
@@ -814,7 +847,7 @@ export class AIChatService {
 
     // 获取历史消息作为上下文
     const contextLength = model.parameters?.contextLength || 20;
-    const history = await this.getRecentMessages(sessionId, contextLength);
+    const history = await this.getRecentMessages(sessionId, contextLength, userId);
 
     // 选择系统提示词
     // disabled: 关闭思考，使用简单提示词
@@ -915,7 +948,8 @@ export class AIChatService {
     }
 
 
-    // 保存AI回复
+
+    // 保存AI回复（添加创建者ID）
     const assistantMessage = this.chatRepository.create({
       chatId: uuidv4(),
       modelId: model.modelId,
@@ -923,6 +957,7 @@ export class AIChatService {
       role: 'assistant',
       content: fullContent,
       thinking: fullThinking || null,
+      createdBy: userId,
     });
     await this.chatRepository.save(assistantMessage);
 

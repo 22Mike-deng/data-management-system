@@ -4,13 +4,15 @@
 * 创建时间：2026-03-11
 * 更新时间：2026-03-13
 */
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto, CreateModelPricingDto, UpdateModelPricingDto } from './dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('ai')
+@UseGuards(JwtAuthGuard)
 export class AIModelController {
   constructor(
     private readonly modelService: AIModelService,
@@ -169,8 +171,10 @@ export class AIModelController {
    * POST /api/ai/chat/send
    */
   @Post('chat/send')
-  async sendMessage(@Body() dto: SendMessageDto) {
-    const result = await this.chatService.sendMessage(dto);
+  async sendMessage(@Body() dto: SendMessageDto, @Req() req: any) {
+    // 获取当前登录用户ID
+    const userId = req.user?.id;
+    const result = await this.chatService.sendMessage(dto, userId);
     return {
       code: 0,
       message: 'success',
@@ -190,6 +194,9 @@ export class AIModelController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
+    // 获取当前登录用户ID
+    const userId = (req as any).user?.id;
+
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -197,7 +204,7 @@ export class AIModelController {
     res.setHeader('X-Accel-Buffering', 'no'); // 禁用 nginx 缓冲
 
     // 获取流式 Observable
-    const observable = await this.chatService.streamMessage(dto);
+    const observable = await this.chatService.streamMessage(dto, userId);
 
     // 订阅 Observable 并写入响应
     const subscription = observable.subscribe({
@@ -226,8 +233,10 @@ export class AIModelController {
    * GET /api/ai/chat/history
    */
   @Get('chat/history')
-  async getChatHistory(@Query() dto: GetChatHistoryDto) {
-    const result = await this.chatService.getChatHistory(dto);
+  async getChatHistory(@Query() dto: GetChatHistoryDto, @Req() req: any) {
+    // 获取当前登录用户ID，只显示该用户的对话
+    const userId = req.user?.id;
+    const result = await this.chatService.getChatHistory(dto, userId);
     return {
       code: 0,
       message: 'success',
@@ -240,8 +249,10 @@ export class AIModelController {
    * GET /api/ai/chat/sessions
    */
   @Get('chat/sessions')
-  async getSessionList() {
-    const sessions = await this.chatService.getSessionList();
+  async getSessionList(@Req() req: any) {
+    // 获取当前登录用户ID，只显示该用户的会话
+    const userId = req.user?.id;
+    const sessions = await this.chatService.getSessionList(userId);
     return {
       code: 0,
       message: 'success',
@@ -254,8 +265,10 @@ export class AIModelController {
    * DELETE /api/ai/chat/sessions/:sessionId
    */
   @Delete('chat/sessions/:sessionId')
-  async deleteSession(@Param('sessionId') sessionId: string) {
-    await this.chatService.deleteSession(sessionId);
+  async deleteSession(@Param('sessionId') sessionId: string, @Req() req: any) {
+    // 获取当前登录用户ID，确保只能删除自己的会话
+    const userId = req.user?.id;
+    await this.chatService.deleteSession(sessionId, userId);
     return {
       code: 0,
       message: '删除成功',
