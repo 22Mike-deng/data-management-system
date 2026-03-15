@@ -506,6 +506,11 @@ export class AIToolsService {
    * 查看表结构
    */
   private async describeTable(tableName: string): Promise<any> {
+    // 【安全修复】验证表名格式，防止访问系统表
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}（不允许访问系统表）`);
+    }
+
     const fullTableName = `data_${tableName}`;
     
     // 检查表是否存在
@@ -556,6 +561,12 @@ export class AIToolsService {
    */
   private async queryData(args: any): Promise<any> {
     const { tableName, fields, page = 1, pageSize = 10, sortBy, sortOrder = 'DESC', keyword, filters, joins } = args;
+
+    // 【安全修复】验证表名格式，防止访问系统表
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}（不允许访问系统表）`);
+    }
+
     const fullTableName = `data_${tableName}`;
     const offset = (page - 1) * pageSize;
     const limit = Math.min(pageSize, 100);
@@ -580,6 +591,12 @@ export class AIToolsService {
     if (joins && Array.isArray(joins)) {
       for (let i = 0; i < joins.length; i++) {
         const join = joins[i];
+
+        // 【安全修复】验证关联表名格式
+        if (!isValidTableName(join.table)) {
+          throw new Error(`无效的关联表名: ${join.table}（不允许访问系统表）`);
+        }
+
         const joinTable = `data_${join.table}`;
         const alias = join.alias || `t${i + 1}`;
         const joinType = join.type === 'INNER' ? 'INNER JOIN' : 'LEFT JOIN';
@@ -720,6 +737,11 @@ export class AIToolsService {
    * 统计数据总数
    */
   private async countData(tableName: string): Promise<any> {
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}（不允许访问系统表）`);
+    }
+
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在
@@ -745,6 +767,12 @@ export class AIToolsService {
    */
   private async aggregateData(args: any): Promise<any> {
     const { tableName, field, operation } = args;
+
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}（不允许访问系统表）`);
+    }
+
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在
@@ -804,6 +832,12 @@ export class AIToolsService {
    */
   private async groupByField(args: any): Promise<any> {
     const { tableName, field, limit = 10 } = args;
+
+    // 【安全修复】验证表名格式
+    if (!isValidTableName(tableName)) {
+      throw new Error(`无效的表名: ${tableName}（不允许访问系统表）`);
+    }
+
     const fullTableName = `data_${tableName}`;
 
     // 检查表是否存在

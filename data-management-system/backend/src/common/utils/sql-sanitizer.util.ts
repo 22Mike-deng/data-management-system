@@ -26,6 +26,17 @@ const SQL_KEYWORDS = [
 ];
 
 /**
+ * 系统表前缀黑名单（AI工具不可访问）
+ * 这些前缀的表是系统核心表，AI工具严禁操作
+ */
+const SYSTEM_TABLE_PREFIXES = [
+  'sys_',      // 系统配置表（sys_user, sys_table, sys_field等）
+  'information_', // 信息模式表
+  'performance_', // 性能模式表
+  'mysql_',    // MySQL系统表
+];
+
+/**
  * 验证表名是否安全
  * @param tableName 表名
  * @returns 是否有效
@@ -43,6 +54,12 @@ export function isValidTableName(tableName: string): boolean {
   // 检查是否包含 SQL 关键字
   const upperName = tableName.toUpperCase();
   if (SQL_KEYWORDS.some(keyword => upperName.includes(keyword))) {
+    return false;
+  }
+
+  // 【安全加固】检查是否为系统表前缀
+  const lowerName = tableName.toLowerCase();
+  if (SYSTEM_TABLE_PREFIXES.some(prefix => lowerName.startsWith(prefix))) {
     return false;
   }
 
