@@ -47,6 +47,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      // 静态资源代理（头像、文件等）
+      '/static': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 })

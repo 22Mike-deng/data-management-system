@@ -250,15 +250,46 @@
           </t-input>
         </t-form-item>
         <t-form-item label="头像" name="avatar">
-          <t-input 
-            v-model="formData.avatar" 
-            placeholder="请输入头像URL地址" 
-            clearable
-          >
-            <template #prefix-icon>
-              <ImageIcon class="w-4 h-4 text-gray-400" />
-            </template>
-          </t-input>
+          <div class="avatar-upload-wrapper">
+            <div class="avatar-preview">
+              <t-avatar
+                :image="formData.avatar"
+                :icon="userAvatarIcon"
+                size="80px"
+                shape="circle"
+              />
+            </div>
+            <div class="avatar-upload-actions">
+              <t-upload
+                v-model="avatarUploadFiles"
+                :action="uploadAction"
+                :headers="uploadHeaders"
+                :before-upload="beforeAvatarUpload"
+                @success="handleAvatarUploadSuccess"
+                @fail="handleAvatarUploadFail"
+                theme="custom"
+                accept="image/*"
+              >
+                <t-button variant="outline" size="small">
+                  <template #icon><Upload class="w-4 h-4" /></template>
+                  上传头像
+                </t-button>
+              </t-upload>
+              <t-button
+                v-if="formData.avatar"
+                variant="text"
+                theme="danger"
+                size="small"
+                @click="handleClearAvatar"
+              >
+                <template #icon><Trash2 class="w-4 h-4" /></template>
+                清除
+              </t-button>
+            </div>
+            <div class="avatar-upload-tip">
+              支持 JPG、PNG、GIF 格式，文件小于 2MB
+            </div>
+          </div>
         </t-form-item>
         <t-form-item label="角色" name="roleId">
           <t-select
@@ -363,6 +394,7 @@ import {
   Image as ImageIcon,
   XCircle,
   CheckIcon as CheckIconComponent,
+  Upload,
 } from 'lucide-vue-next'
 import dayjs from 'dayjs'
 import {
@@ -454,6 +486,56 @@ const currentUser = ref<SysUser | null>(null)
 const resetPasswordForm = reactive({
   password: '',
 })
+
+// 头像上传相关
+const avatarUploadFiles = ref([])
+const uploadAction = '/api/upload/avatar'
+const uploadHeaders = ref({
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+})
+
+// 头像上传前校验
+const beforeAvatarUpload = (file: File) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt2M = file.size / 1024 / 1024 < 2
+
+  if (!isImage) {
+    MessagePlugin.error('请上传图片文件')
+    return false
+  }
+  if (!isLt2M) {
+    MessagePlugin.error('图片大小不能超过 2MB')
+    return false
+  }
+  return true
+}
+
+// 后端服务器地址
+const backendUrl = 'http://localhost:3000'
+
+// 头像上传成功
+// TDesign Upload success 回调参数格式: { file, fileList, response, ... }
+const handleAvatarUploadSuccess = (context: { file: any; response: any }) => {
+  const res = context.response
+  if (res?.code === 0 && res.data?.url) {
+    // 拼接完整的后端地址
+    formData.avatar = `${backendUrl}${res.data.url}`
+    MessagePlugin.success('头像上传成功')
+  } else {
+    MessagePlugin.error(res?.message || '上传失败')
+  }
+}
+
+// 头像上传失败
+const handleAvatarUploadFail = ({ file }: { file: any }) => {
+  MessagePlugin.error(`头像上传失败: ${file.name}`)
+}
+
+// 清除头像
+const handleClearAvatar = () => {
+  formData.avatar = ''
+  avatarUploadFiles.value = []
+}
 
 // 格式化日期
 const formatDate = (date: string) => {
@@ -750,6 +832,32 @@ onMounted(() => {
 .status-radio {
   display: flex;
   align-items: center;
+}
+
+// 头像上传样式
+.avatar-upload-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+
+  .avatar-preview {
+    :deep(.t-avatar) {
+      border: 2px solid var(--color-border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  .avatar-upload-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .avatar-upload-tip {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
 }
 
 .reset-password-content {

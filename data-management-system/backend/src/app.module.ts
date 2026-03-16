@@ -25,6 +25,7 @@ import { AuditLogModule } from './modules/audit-log';
 import { DataImportExportModule } from './modules/data-import-export';
 import { PermissionModule } from './modules/permission';
 import { RoleModule } from './modules/role';
+import { UploadModule } from './modules/upload';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { RoleModule } from './modules/role';
     DataImportExportModule,
     PermissionModule,
     RoleModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [
