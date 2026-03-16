@@ -100,6 +100,11 @@ export class AIChatService {
     // 总是使用清理后的 content（移除 thinking 标签）
     finalContent = parsed.content;
 
+    // 如果思考模式关闭，清空思考内容（不保存、不显示）
+    if (dto.thinkingType !== 'enabled') {
+      thinking = undefined;
+    }
+
     // 保存AI回复（包含思考步骤，添加创建者ID）
     const assistantMessage = this.chatRepository.create({
       chatId: uuidv4(),
@@ -763,6 +768,11 @@ export class AIChatService {
       }
     }
 
+    // 如果思考模式关闭，清空思考内容（不保存、不显示）
+    if (dto.thinkingType !== 'enabled') {
+      fullThinking = '';
+    }
+
     // 【特殊处理】如果 content 为空但 thinking 有内容，将 thinking 作为正式回复
     // 某些模型（如 DeepSeek）可能在思考模式下只返回 reasoning_content
     if (!fullContent.trim() && fullThinking.trim()) {
@@ -967,10 +977,13 @@ export class AIChatService {
                     // 找到结束标签，提取思考内容（不含标签）
                     const thinkingContent = thinkingBuffer.substring(0, endIdx);
                     fullThinking += thinkingContent;
-                    subject.next({
-                      type: 'thinking',
-                      data: JSON.stringify({ content: thinkingContent }),
-                    } as MessageEvent);
+                    // 只有开启思考模式时才发送 thinking 事件
+                    if (thinkingType === 'enabled') {
+                      subject.next({
+                        type: 'thinking',
+                        data: JSON.stringify({ content: thinkingContent }),
+                      } as MessageEvent);
+                    }
 
                     // 移除已处理的部分（包括结束标签）
                     thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
@@ -1060,10 +1073,13 @@ export class AIChatService {
             const endTagLength = endMatch[0].length;
             const thinkingContent = thinkingBuffer.substring(0, endIdx);
             fullThinking += thinkingContent;
-            subject.next({
-              type: 'thinking',
-              data: JSON.stringify({ content: thinkingContent }),
-            } as MessageEvent);
+            // 只有开启思考模式时才发送 thinking 事件
+            if (thinkingType === 'enabled') {
+              subject.next({
+                type: 'thinking',
+                data: JSON.stringify({ content: thinkingContent }),
+              } as MessageEvent);
+            }
             thinkingBuffer = thinkingBuffer.substring(endIdx + endTagLength);
             isInThinking = false;
             // 过滤空白
@@ -1074,10 +1090,13 @@ export class AIChatService {
           } else {
             // 没有结束标签，全部作为思考内容
             fullThinking += thinkingBuffer;
-            subject.next({
-              type: 'thinking',
-              data: JSON.stringify({ content: thinkingBuffer }),
-            } as MessageEvent);
+            // 只有开启思考模式时才发送 thinking 事件
+            if (thinkingType === 'enabled') {
+              subject.next({
+                type: 'thinking',
+                data: JSON.stringify({ content: thinkingBuffer }),
+              } as MessageEvent);
+            }
             thinkingBuffer = '';
           }
         } else {
