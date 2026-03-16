@@ -2,7 +2,7 @@
  * 用户管理服务
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-14
+ * 更新时间：2026-03-16
  */
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +10,25 @@ import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { SysUser } from '../../database/entities/sys-user.entity';
 import { validatePassword } from '../../common/utils/password.util';
+
+/**
+ * 生成用户ID：日期(YYYYMMDD) + 12位随机数字
+ * 示例：20260316546987123548
+ */
+function generateUserId(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const datePrefix = `${year}${month}${day}`;
+  
+  // 生成12位随机数字
+  const randomPart = Array.from({ length: 12 }, () => 
+    Math.floor(Math.random() * 10)
+  ).join('');
+  
+  return datePrefix + randomPart;
+}
 
 @Injectable()
 export class UserService {
@@ -111,6 +130,7 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const user = this.userRepository.create({
+      id: generateUserId(), // 生成用户ID：日期 + 12位随机数
       ...data,
       password: hashedPassword,
       createdBy,

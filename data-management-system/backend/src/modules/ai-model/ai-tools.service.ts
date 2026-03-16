@@ -452,14 +452,25 @@ export class AIToolsService {
     const requiredPermission = this.getToolPermission(fn.name);
     if (requiredPermission && !isSuperAdmin) {
       if (!userPermissions.includes(requiredPermission)) {
+        // 根据工具类型返回友好的提示信息，不暴露权限编码
+        let friendlyMessage = '您没有权限执行此操作';
+        if (['delete_record', 'batch_delete_records'].includes(fn.name)) {
+          friendlyMessage = '您没有删除数据的权限，如需此权限请联系管理员';
+        } else if (fn.name === 'update_record') {
+          friendlyMessage = '您没有编辑数据的权限，如需此权限请联系管理员';
+        } else if (fn.name === 'insert_record') {
+          friendlyMessage = '您没有新增数据的权限，如需此权限请联系管理员';
+        } else if (fn.name === 'search_knowledge') {
+          friendlyMessage = '您没有访问知识库的权限，如需此权限请联系管理员';
+        } else {
+          friendlyMessage = '您没有查询数据的权限，如需此权限请联系管理员';
+        }
+        
         return {
           toolCallId: id,
           name: fn.name,
           success: false,
-          result: { 
-            error: `权限不足：使用此工具需要 "${requiredPermission}" 权限`,
-            requiredPermission,
-          },
+          result: { error: friendlyMessage },
         };
       }
     }
