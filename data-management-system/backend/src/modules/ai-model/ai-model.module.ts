@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing } from '@/database/entities';
+import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing, SysUser } from '@/database/entities';
 import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { AIToolsService } from './ai-tools.service';
@@ -11,7 +11,7 @@ import { RoleModule } from '../role/role.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing]),
+    TypeOrmModule.forFeature([AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing, SysUser]),
     KnowledgeBaseModule,
     PermissionModule,
     RoleModule,

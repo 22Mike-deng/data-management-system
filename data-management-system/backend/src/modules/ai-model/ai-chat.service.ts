@@ -2,16 +2,18 @@
 * AI对话服务
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-14
+* 更新时间：2026-03-16
 */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Observable, Subject } from 'rxjs';
-import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing } from '@/database/entities';
+import { AIModelConfig, AIChatHistory, TokenUsage, AIModelPricing, SysUser } from '@/database/entities';
 import { AIModelService } from './ai-model.service';
 import { AIToolsService } from './ai-tools.service';
+import { RoleService } from '../role/role.service';
+import { PermissionService } from '../permission/permission.service';
 import { SendMessageDto, GetChatHistoryDto, ThinkingType } from './dto';
 import { getSystemPrompt } from './prompts/system-prompt';
 import { 
@@ -31,8 +33,12 @@ export class AIChatService {
     private tokenUsageRepository: Repository<TokenUsage>,
     @InjectRepository(AIModelPricing)
     private pricingRepository: Repository<AIModelPricing>,
+    @InjectRepository(SysUser)
+    private userRepository: Repository<SysUser>,
     private modelService: AIModelService,
     private toolsService: AIToolsService,
+    private roleService: RoleService,
+    private permissionService: PermissionService,
   ) {}
 
   /**
@@ -77,6 +83,9 @@ export class AIChatService {
       enableThinking,
     });
 
+    // 获取用户权限信息
+    const { permissions: userPermissions, isSuperAdmin } = await this.getUserPermissionContext(userId);
+
     // 调用AI模型获取回复（支持工具调用）
     const { reply, thinking: nativeThinking, inputTokens, outputTokens, toolCalls } = await this.callAIModelWithTools(
       model,
@@ -85,6 +94,8 @@ export class AIChatService {
       systemPrompt,
       dto.useKnowledgeBase,
       dto.thinkingType,
+      userPermissions,
+      isSuperAdmin,
     );
 
     // 解析思考步骤（优先使用原生 thinking，其次解析标签）
@@ -127,6 +138,42 @@ export class AIChatService {
       tokens: { input: inputTokens, output: outputTokens },
       toolCalls,
     };
+  }
+
+  /**
+   * 获取用户的权限信息
+   * @param userId 用户ID
+   * @returns 用户权限信息和是否为超级管理员
+   */
+  private async getUserPermissionContext(userId?: string): Promise<{
+    permissions: string[];
+    isSuperAdmin: boolean;
+  }> {
+    // 默认无权限
+    const defaultContext = { permissions: [], isSuperAdmin: false };
+    
+    if (!userId) {
+      return defaultContext;
+    }
+
+    try {
+      // 获取用户信息
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (!user || !user.roleId) {
+        return defaultContext;
+      }
+
+      // 检查是否为超级管理员
+      const isSuperAdmin = await this.roleService.isSuperAdmin(user.roleId);
+      
+      // 获取用户权限列表
+      const permissions = await this.permissionService.getPermissionCodesByRoleId(user.roleId);
+
+      return { permissions, isSuperAdmin };
+    } catch (error) {
+      console.error('获取用户权限失败:', error);
+      return defaultContext;
+    }
   }
 
   /**
@@ -278,6 +325,8 @@ export class AIChatService {
     systemPrompt: string,
     useKnowledgeBase: boolean = false,
     thinkingType?: ThinkingType,
+    userPermissions: string[] = [],
+    isSuperAdmin: boolean = false,
   ): Promise<{ reply: string; thinking?: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     // 构建消息历史
     const messages: any[] = [
@@ -296,13 +345,13 @@ export class AIChatService {
         case 'qwen':
         case 'zhipu':
         case 'custom':
-          return await this.callOpenAIWithTools(model, messages, tools, thinkingType);
+          return await this.callOpenAIWithTools(model, messages, tools, thinkingType, userPermissions, isSuperAdmin);
         case 'claude':
-          return await this.callClaudeWithTools(model, messages, tools, systemPrompt);
+          return await this.callClaudeWithTools(model, messages, tools, systemPrompt, userPermissions, isSuperAdmin);
         case 'wenxin':
           throw new Error('文心一言暂不支持工具调用，请使用其他模型');
         default:
-          return await this.callOpenAIWithTools(model, messages, tools, thinkingType);
+          return await this.callOpenAIWithTools(model, messages, tools, thinkingType, userPermissions, isSuperAdmin);
       }
     } catch (error: any) {
       console.error('AI调用失败:', error);
@@ -318,6 +367,8 @@ export class AIChatService {
     messages: any[],
     tools: any[],
     thinkingType?: ThinkingType,
+    userPermissions: string[] = [],
+    isSuperAdmin: boolean = false,
   ): Promise<{ reply: string; thinking?: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     const parameters = model.parameters || {};
     // 根据模型类型限制 maxTokens
@@ -408,7 +459,7 @@ export class AIChatService {
 
         // 执行每个工具调用
         for (const toolCall of assistantMessage.tool_calls) {
-          const result = await this.toolsService.executeToolCall(toolCall);
+          const result = await this.toolsService.executeToolCall(toolCall, userPermissions, isSuperAdmin);
           allToolCalls.push(result);
 
           // 添加工具结果到消息历史
@@ -463,6 +514,8 @@ export class AIChatService {
     messages: any[],
     tools: any[],
     systemPrompt: string,
+    userPermissions: string[] = [],
+    isSuperAdmin: boolean = false,
   ): Promise<{ reply: string; inputTokens: number; outputTokens: number; toolCalls?: any[] }> {
     const parameters = model.parameters || {};
     const allToolCalls: any[] = [];
@@ -538,7 +591,7 @@ export class AIChatService {
               arguments: JSON.stringify(toolBlock.input),
             },
           };
-          const result = await this.toolsService.executeToolCall(toolCall);
+          const result = await this.toolsService.executeToolCall(toolCall, userPermissions, isSuperAdmin);
           allToolCalls.push(result);
 
           // 添加工具结果
@@ -686,6 +739,9 @@ export class AIChatService {
       enableThinking,
     });
 
+    // 获取用户权限信息
+    const { permissions: userPermissions, isSuperAdmin } = await this.getUserPermissionContext(userId);
+
     // 构建消息
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
@@ -711,6 +767,8 @@ export class AIChatService {
         tools,
         dto.thinkingType,
         subject,
+        userPermissions,
+        isSuperAdmin,
         (thinking, content, inputTokens, outputTokens) => {
           fullThinking += thinking;
           fullContent += content;
@@ -825,6 +883,8 @@ export class AIChatService {
     tools: any[],
     thinkingType: ThinkingType | undefined,
     subject: Subject<MessageEvent>,
+    userPermissions: string[] = [],
+    isSuperAdmin: boolean = false,
     onChunk: (thinking: string, content: string, inputTokens: number, outputTokens: number) => void,
   ): Promise<{ content: string; toolCalls?: any[]; rawToolCalls?: any[] }> {
     const parameters = model.parameters || {};
@@ -1152,7 +1212,7 @@ export class AIChatService {
               name: rawTool.function.name,
               arguments: rawTool.function.arguments,
             },
-          });
+          }, userPermissions, isSuperAdmin);
           toolCalls.push({
             id: rawTool.id,
             name: rawTool.function.name,

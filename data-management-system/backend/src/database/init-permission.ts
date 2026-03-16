@@ -134,6 +134,11 @@ async function initPermissionData() {
       // AI功能权限
       { id: generateUUID(), code: 'ai:model', name: 'AI模型管理', type: 'menu', routePath: '/ai-model', sort: 30 },
       { id: generateUUID(), code: 'ai:chat', name: 'AI对话', type: 'menu', routePath: '/ai-chat', sort: 31 },
+      // AI工具权限（细粒度控制）
+      { id: generateUUID(), code: 'ai:tool:view', name: 'AI工具-查询数据', type: 'button', sort: 32 },
+      { id: generateUUID(), code: 'ai:tool:create', name: 'AI工具-新增数据', type: 'button', sort: 33 },
+      { id: generateUUID(), code: 'ai:tool:edit', name: 'AI工具-编辑数据', type: 'button', sort: 34 },
+      { id: generateUUID(), code: 'ai:tool:delete', name: 'AI工具-删除数据', type: 'button', sort: 35 },
 
       // 知识库权限
       { id: generateUUID(), code: 'knowledge:view', name: '查看知识库', type: 'menu', routePath: '/knowledge-base', sort: 40 },
@@ -197,6 +202,7 @@ async function initPermissionData() {
       'table:view', 'table:create', 'table:edit', 'table:delete',
       'data:view', 'data:create', 'data:edit', 'data:delete', 'data:export', 'data:import',
       'ai:model', 'ai:chat',
+      'ai:tool:view', 'ai:tool:create', 'ai:tool:edit', 'ai:tool:delete',
       'knowledge:view', 'knowledge:manage',
       'audit:view',
       'visualization:view',
@@ -213,7 +219,7 @@ async function initPermissionData() {
     console.log(`已为管理员分配 ${adminPermissions.length} 条权限`);
 
     // 普通用户拥有基本权限
-    const userPermissionCodes = ['data:view', 'ai:chat', 'knowledge:view', 'visualization:view'];
+    const userPermissionCodes = ['data:view', 'ai:chat', 'ai:tool:view', 'knowledge:view', 'visualization:view'];
     const userPermissions = permissions.filter((p) => userPermissionCodes.includes(p.code));
     for (const permission of userPermissions) {
       await dataSource.query(

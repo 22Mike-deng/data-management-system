@@ -2,13 +2,35 @@
  * AI工具服务 - 数据库管理工具
  * 创建者：dzh
  * 创建时间：2026-03-12
- * 更新时间：2026-03-14
+ * 更新时间：2026-03-16
  */
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { KnowledgeBaseService } from '../knowledge-base';
 import { isValidTableName, validateFieldNames } from '../../common/utils/sql-sanitizer.util';
+
+// 工具权限映射
+const TOOL_PERMISSION_MAP: Record<string, string> = {
+  // 查询类工具 - 需要 ai:tool:view 权限
+  list_tables: 'ai:tool:view',
+  describe_table: 'ai:tool:view',
+  query_data: 'ai:tool:view',
+  count_data: 'ai:tool:view',
+  aggregate_data: 'ai:tool:view',
+  group_by_field: 'ai:tool:view',
+  search_field: 'ai:tool:view',
+  get_table_stats: 'ai:tool:view',
+  // 新增类工具 - 需要 ai:tool:create 权限
+  insert_record: 'ai:tool:create',
+  // 编辑类工具 - 需要 ai:tool:edit 权限
+  update_record: 'ai:tool:edit',
+  // 删除类工具 - 需要 ai:tool:delete 权限
+  delete_record: 'ai:tool:delete',
+  batch_delete_records: 'ai:tool:delete',
+  // 知识库工具 - 需要 knowledge:view 权限
+  search_knowledge: 'knowledge:view',
+};
 
 // 工具参数属性定义
 interface ParameterProperty {
@@ -404,11 +426,43 @@ export class AIToolsService {
   }
 
   /**
-   * 执行工具调用
+   * 获取工具所需的权限
+   * @param toolName 工具名称
+   * @returns 所需权限编码，如果不需要权限则返回 null
    */
-  async executeToolCall(toolCall: { id: string; function: { name: string; arguments: string } }): Promise<ToolCallResult> {
+  getToolPermission(toolName: string): string | null {
+    return TOOL_PERMISSION_MAP[toolName] || null;
+  }
+
+  /**
+   * 执行工具调用
+   * @param toolCall 工具调用参数
+   * @param userPermissions 用户拥有的权限列表
+   * @param isSuperAdmin 是否为超级管理员
+   */
+  async executeToolCall(
+    toolCall: { id: string; function: { name: string; arguments: string } },
+    userPermissions: string[] = [],
+    isSuperAdmin: boolean = false,
+  ): Promise<ToolCallResult> {
     const { id, function: fn } = toolCall;
     const args = JSON.parse(fn.arguments);
+
+    // 权限检查
+    const requiredPermission = this.getToolPermission(fn.name);
+    if (requiredPermission && !isSuperAdmin) {
+      if (!userPermissions.includes(requiredPermission)) {
+        return {
+          toolCallId: id,
+          name: fn.name,
+          success: false,
+          result: { 
+            error: `权限不足：使用此工具需要 "${requiredPermission}" 权限`,
+            requiredPermission,
+          },
+        };
+      }
+    }
 
     try {
       let result: any;
