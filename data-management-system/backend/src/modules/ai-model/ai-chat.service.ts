@@ -326,20 +326,32 @@ export class AIChatService {
     let totalOutputTokens = 0;
     let nativeThinking: string | undefined;
 
+    // 【DeepSeek 特殊处理】检测是否为 DeepSeek 模型
+    const isDeepSeek = this.isDeepSeekModel(model.modelIdentifier);
+    // DeepSeek reasoner 模型自带思考模式
+    const isDeepSeekReasoner = isDeepSeek && model.modelIdentifier.toLowerCase().includes('reasoner');
+
     // 构建请求体
     const requestBody: any = {
       model: model.modelIdentifier,
       messages,
-      temperature: parameters.temperature ?? DEFAULT_AI_PARAMS.TEMPERATURE,
       max_tokens: maxTokens,
-      top_p: parameters.topP ?? DEFAULT_AI_PARAMS.TOP_P,
       tools,
       tool_choice: 'auto',
     };
 
+    // 【DeepSeek 特殊处理】DeepSeek 某些参数不生效或不支持
+    if (!isDeepSeek) {
+      // 非 DeepSeek 模型使用 temperature 和 top_p
+      requestBody.temperature = parameters.temperature ?? DEFAULT_AI_PARAMS.TEMPERATURE;
+      requestBody.top_p = parameters.topP ?? DEFAULT_AI_PARAMS.TOP_P;
+    }
+    // DeepSeek 的 temperature 和 top_p 不生效，无需设置
+
     // 添加 thinking 参数（用于豆包等支持原生深度思考的模型）
+    // DeepSeek reasoner 模型自带思考模式，无需额外参数
     // 只有 enabled 时才发送 thinking 参数
-    if (thinkingType === 'enabled') {
+    if (thinkingType === 'enabled' && !isDeepSeekReasoner) {
       requestBody.thinking = { type: 'enabled' };
     }
 
@@ -809,16 +821,29 @@ export class AIChatService {
       maxTokens = limit;
     }
 
+    // 【DeepSeek 特殊处理】检测是否为 DeepSeek 模型
+    const isDeepSeek = this.isDeepSeekModel(model.modelIdentifier);
+    // DeepSeek reasoner 模型自带思考模式
+    const isDeepSeekReasoner = isDeepSeek && model.modelIdentifier.toLowerCase().includes('reasoner');
+
     // 构建请求体
     const requestBody: any = {
       model: model.modelIdentifier,
       messages,
-      temperature: parameters.temperature ?? 0.7,
-      max_tokens: maxTokens,
-      top_p: parameters.topP ?? 1,
       stream: true, // 启用流式响应
       stream_options: { include_usage: true }, // 请求返回token使用量
     };
+
+    // 【DeepSeek 特殊处理】DeepSeek 某些参数不生效或不支持
+    if (!isDeepSeek) {
+      // 非 DeepSeek 模型使用 temperature 和 top_p
+      requestBody.temperature = parameters.temperature ?? 0.7;
+      requestBody.top_p = parameters.topP ?? 1;
+    }
+    // DeepSeek 的 temperature 和 top_p 不生效，无需设置
+
+    // 设置 max_tokens
+    requestBody.max_tokens = maxTokens;
 
     // 添加工具定义
     if (tools && tools.length > 0) {
@@ -826,8 +851,9 @@ export class AIChatService {
       requestBody.tool_choice = 'auto';
     }
 
-    // 添加 thinking 参数（只有 enabled 时才发送）
-    if (thinkingType === 'enabled') {
+    // 添加 thinking 参数
+    // DeepSeek reasoner 模型自带思考模式，无需额外参数
+    if (thinkingType === 'enabled' && !isDeepSeekReasoner) {
       requestBody.thinking = { type: 'enabled' };
     }
 
@@ -900,6 +926,11 @@ export class AIChatService {
                   inputTokens = Math.floor(totalTokens * 0.6);
                   outputTokens = totalTokens - inputTokens;
                 }
+              }
+              // 【DeepSeek 特殊处理】DeepSeek 可能返回 prompt_cache_hit_tokens
+              if (data.usage.prompt_cache_hit_tokens !== undefined) {
+                // 缓存命中可以减少计费，但这里只记录
+                console.log(`[DeepSeek] Cache hit tokens: ${data.usage.prompt_cache_hit_tokens}`);
               }
             }
 
@@ -1115,5 +1146,15 @@ export class AIChatService {
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       rawToolCalls: rawToolCalls.length > 0 ? rawToolCalls : undefined,
     };
+  }
+
+  /**
+   * 检测是否为 DeepSeek 模型
+   * 通过模型标识符模糊匹配
+   */
+  private isDeepSeekModel(modelIdentifier: string): boolean {
+    if (!modelIdentifier) return false;
+    const lowerId = modelIdentifier.toLowerCase();
+    return lowerId.includes('deepseek');
   }
 }
