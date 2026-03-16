@@ -9,9 +9,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { SysUser } from '../../database/entities/sys-user.entity';
+import { PermissionModule } from '../permission/permission.module';
+import { RoleModule } from '../role/role.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SysUser])],
+  imports: [
+    TypeOrmModule.forFeature([SysUser]),
+    PermissionModule,
+    RoleModule,
+  ],
   controllers: [UserController],
   providers: [UserService],
   exports: [UserService],

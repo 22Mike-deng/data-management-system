@@ -46,7 +46,7 @@ export class UserService {
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: ['id', 'username', 'email', 'nickname', 'avatar', 'status', 'lastLoginAt', 'lastLoginIp', 'createdBy', 'createdAt', 'updatedAt'],
+      select: ['id', 'username', 'email', 'nickname', 'avatar', 'status', 'roleId', 'lastLoginAt', 'lastLoginIp', 'createdBy', 'createdAt', 'updatedAt'],
     });
 
     return {
@@ -63,7 +63,7 @@ export class UserService {
   async findOne(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
-      select: ['id', 'username', 'email', 'nickname', 'avatar', 'status', 'lastLoginAt', 'lastLoginIp', 'createdBy', 'createdAt', 'updatedAt'],
+      select: ['id', 'username', 'email', 'nickname', 'avatar', 'status', 'roleId', 'lastLoginAt', 'lastLoginIp', 'createdBy', 'createdAt', 'updatedAt'],
     });
 
     if (!user) {
@@ -83,6 +83,7 @@ export class UserService {
     nickname?: string;
     avatar?: string;
     status?: number;
+    roleId?: string;
   }, createdBy: string) {
     // 检查用户名是否已存在
     const existingUsername = await this.userRepository.findOne({
@@ -131,6 +132,7 @@ export class UserService {
     avatar?: string;
     status?: number;
     password?: string;
+    roleId?: string;
   }, updatedBy: string) {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {

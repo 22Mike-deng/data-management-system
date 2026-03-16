@@ -119,6 +119,11 @@
             <span>{{ row.email }}</span>
           </div>
         </template>
+        <template #roleName="{ row }">
+          <t-tag :theme="(row as any).roleId ? 'primary' : 'default'" variant="light">
+            {{ getRoleName((row as any).roleId) }}
+          </t-tag>
+        </template>
         <template #status="{ row }">
           <t-tag 
             :theme="row.status === 0 ? 'success' : 'danger'" 
@@ -255,6 +260,20 @@
             </template>
           </t-input>
         </t-form-item>
+        <t-form-item label="角色" name="roleId">
+          <t-select
+            v-model="formData.roleId"
+            placeholder="请选择角色"
+            clearable
+          >
+            <t-option
+              v-for="role in roleList"
+              :key="role.id"
+              :value="role.id"
+              :label="role.name"
+            />
+          </t-select>
+        </t-form-item>
         <t-form-item label="状态" name="status">
           <t-radio-group v-model="formData.status">
             <t-radio :value="0">
@@ -354,6 +373,7 @@ import {
   resetPassword as resetPasswordApi,
   toggleUserStatus,
 } from '@/api/user'
+import request from '@/utils/request'
 import type { SysUser, CreateUserParams, UpdateUserParams } from '@/types/user'
 
 // 图标
@@ -372,6 +392,9 @@ const searchForm = reactive({
 const userList = ref<SysUser[]>([])
 const loading = ref(false)
 
+// 角色列表
+const roleList = ref<{ id: string; code: string; name: string }[]>([])
+
 // 分页
 const pagination = reactive({
   current: 1,
@@ -386,6 +409,7 @@ const columns = [
   { colKey: 'avatar', title: '头像', width: 70, cell: 'avatar', align: 'center' },
   { colKey: 'userInfo', title: '用户信息', width: 160, cell: 'userInfo' },
   { colKey: 'email', title: '邮箱', width: 200, cell: 'email' },
+  { colKey: 'roleName', title: '角色', width: 120, cell: 'roleName', align: 'center' },
   { colKey: 'status', title: '状态', width: 100, cell: 'status', align: 'center' },
   { colKey: 'lastLoginAt', title: '最后登录', width: 180, cell: 'lastLoginAt' },
   { colKey: 'createdAt', title: '创建时间', width: 180, cell: 'createdAt' },
@@ -399,13 +423,14 @@ const isEdit = ref(false)
 const formRef = ref()
 const currentUserId = ref('')
 
-const formData = reactive<CreateUserParams & { status: number }>({
+const formData = reactive<CreateUserParams & { status: number; roleId: string }>({
   username: '',
   password: '',
   email: '',
   nickname: '',
   avatar: '',
   status: 0,
+  roleId: '',
 })
 
 const formRules = {
@@ -454,6 +479,23 @@ const fetchUserList = async () => {
   }
 }
 
+// 获取角色列表
+const fetchRoleList = async () => {
+  try {
+    const res = await request.get('/role')
+    roleList.value = res.data || []
+  } catch (error: any) {
+    console.error('获取角色列表失败:', error)
+  }
+}
+
+// 获取角色名称
+const getRoleName = (roleId: string | null) => {
+  if (!roleId) return '未分配'
+  const role = roleList.value.find((r) => r.id === roleId)
+  return role?.name || '未知角色'
+}
+
 // 搜索
 const handleSearch = () => {
   pagination.current = 1
@@ -487,6 +529,7 @@ const openCreateDialog = () => {
     nickname: '',
     avatar: '',
     status: 0,
+    roleId: '',
   })
   dialogVisible.value = true
 }
@@ -503,6 +546,7 @@ const openEditDialog = (row: SysUser) => {
     nickname: row.nickname || '',
     avatar: row.avatar || '',
     status: row.status,
+    roleId: (row as any).roleId || '',
   })
   dialogVisible.value = true
 }
@@ -519,6 +563,7 @@ const handleDialogConfirm = async () => {
         nickname: formData.nickname,
         avatar: formData.avatar,
         status: formData.status,
+        roleId: formData.roleId,
       }
       await updateUser(currentUserId.value, updateData)
       MessagePlugin.success('更新成功')
@@ -588,6 +633,7 @@ const handleResetPasswordConfirm = async () => {
 
 onMounted(() => {
   fetchUserList()
+  fetchRoleList()
 })
 </script>
 

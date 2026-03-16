@@ -2,13 +2,17 @@
  * 动态数据控制器
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-16
  */
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import { DynamicDataService } from './dynamic-data.service';
 import { QueryDataDto, CreateDataDto, UpdateDataDto, BatchDeleteDto, AggregateQueryDto } from './dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @Controller('dynamic-data')
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class DynamicDataController {
   constructor(private readonly dynamicDataService: DynamicDataService) {}
 
@@ -17,6 +21,7 @@ export class DynamicDataController {
    * POST /api/dynamic-data/:tableId/create-table
    */
   @Post(':tableId/create-table')
+  @RequirePermission('table:create')
   async createDynamicTable(@Param('tableId') tableId: string) {
     await this.dynamicDataService.createDynamicTable(tableId);
     return {
@@ -30,6 +35,7 @@ export class DynamicDataController {
    * GET /api/dynamic-data/:tableId
    */
   @Get(':tableId')
+  @RequirePermission('data:view')
   async findDataList(
     @Param('tableId') tableId: string,
     @Query() query: QueryDataDto,
@@ -47,6 +53,7 @@ export class DynamicDataController {
    * GET /api/dynamic-data/:tableId/:dataId
    */
   @Get(':tableId/:dataId')
+  @RequirePermission('data:view')
   async findDataById(
     @Param('tableId') tableId: string,
     @Param('dataId') dataId: string,
@@ -64,6 +71,7 @@ export class DynamicDataController {
    * POST /api/dynamic-data/:tableId
    */
   @Post(':tableId')
+  @RequirePermission('data:create')
   @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   async createData(
     @Param('tableId') tableId: string,
@@ -83,6 +91,7 @@ export class DynamicDataController {
    * PUT /api/dynamic-data/:tableId/:dataId
    */
   @Put(':tableId/:dataId')
+  @RequirePermission('data:edit')
   @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   async updateData(
     @Param('tableId') tableId: string,
@@ -102,6 +111,7 @@ export class DynamicDataController {
    * DELETE /api/dynamic-data/:tableId/:dataId
    */
   @Delete(':tableId/:dataId')
+  @RequirePermission('data:delete')
   async deleteData(
     @Param('tableId') tableId: string,
     @Param('dataId') dataId: string,
@@ -118,6 +128,7 @@ export class DynamicDataController {
    * POST /api/dynamic-data/:tableId/batch-delete
    */
   @Post(':tableId/batch-delete')
+  @RequirePermission('data:delete')
   async batchDelete(
     @Param('tableId') tableId: string,
     @Body() dto: BatchDeleteDto,
@@ -135,6 +146,7 @@ export class DynamicDataController {
    * 支持多字段分组和多聚合统计
    */
   @Get(':tableId/aggregate')
+  @RequirePermission('data:view')
   async aggregateQuery(
     @Param('tableId') tableId: string,
     @Query() query: AggregateQueryDto,

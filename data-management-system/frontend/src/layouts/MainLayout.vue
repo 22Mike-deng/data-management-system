@@ -22,29 +22,43 @@ import {
   User,
   Users,
   FileText,
+  Shield,
+  Lock,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
+import { usePermissionStore } from '@/stores/permission'
 import ThemeSwitch from '@/components/ThemeSwitch.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const permissionStore = usePermissionStore()
 const collapsed = ref(false)
 
-// 菜单配置
-const menuItems = [
+// 菜单配置（包含权限标识）
+const allMenuItems = [
   { key: '/dashboard', title: '工作台', icon: Home },
-  { key: '/user-manage', title: '用户管理', icon: Users },
-  { key: '/table-manage', title: '数据表管理', icon: Database },
-  { key: '/visualization', title: '数据可视化', icon: BarChart3 },
-  { key: '/ai-model', title: 'AI模型管理', icon: Bot },
-  { key: '/ai-chat', title: 'AI对话', icon: MessageSquare },
-  { key: '/knowledge-base', title: '知识库管理', icon: BookOpen },
-  { key: '/token-stats', title: 'Token统计', icon: LineChart },
-  { key: '/audit-log', title: '审计日志', icon: FileText },
+  { key: '/user-manage', title: '用户管理', icon: Users, permission: 'user:view' },
+  { key: '/role-manage', title: '角色管理', icon: Shield, permission: 'role:manage' },
+  { key: '/permission-manage', title: '权限管理', icon: Lock, permission: 'permission:manage' },
+  { key: '/table-manage', title: '数据表管理', icon: Database, permission: 'table:view' },
+  { key: '/visualization', title: '数据可视化', icon: BarChart3, permission: 'visualization:view' },
+  { key: '/ai-model', title: 'AI模型管理', icon: Bot, permission: 'ai:model' },
+  { key: '/ai-chat', title: 'AI对话', icon: MessageSquare, permission: 'ai:chat' },
+  { key: '/knowledge-base', title: '知识库管理', icon: BookOpen, permission: 'knowledge:view' },
+  { key: '/token-stats', title: 'Token统计', icon: LineChart, permission: 'token:stats' },
+  { key: '/audit-log', title: '审计日志', icon: FileText, permission: 'audit:view' },
 ]
+
+// 根据权限过滤菜单
+const menuItems = computed(() => {
+  return allMenuItems.filter((item) => {
+    if (!item.permission) return true
+    return permissionStore.hasPermission(item.permission)
+  })
+})
 
 // 当前激活菜单
 const activeMenu = computed(() => {
@@ -71,9 +85,13 @@ const handleLogout = async () => {
 }
 
 // 初始化获取用户信息
-onMounted(() => {
-  if (userStore.token && !userStore.userInfo) {
-    userStore.fetchUserInfo()
+onMounted(async () => {
+  // 如果有 token，确保用户信息和权限已加载
+  if (userStore.token) {
+    // 如果没有权限信息，重新获取用户信息
+    if (permissionStore.permissions.length === 0 && !permissionStore.role) {
+      await userStore.fetchUserInfo()
+    }
   }
   // 初始化主题
   themeStore.initTheme()

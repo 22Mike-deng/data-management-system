@@ -2,9 +2,9 @@
  * 认证模块定义
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-14
+ * 更新时间：2026-03-16
  */
-import { Module, Logger } from '@nestjs/common';
+import { Module, Logger, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,6 +13,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { SysUser } from '../../database/entities/sys-user.entity';
+import { PermissionModule } from '../permission';
+import { RoleModule } from '../role';
 
 const logger = new Logger('AuthModule');
 
@@ -47,6 +49,9 @@ const logger = new Logger('AuthModule');
       },
       inject: [ConfigService],
     }),
+    // 使用 forwardRef 解决循环依赖
+    forwardRef(() => PermissionModule),
+    forwardRef(() => RoleModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

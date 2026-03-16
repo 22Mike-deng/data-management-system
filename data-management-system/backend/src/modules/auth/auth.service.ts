@@ -2,9 +2,9 @@
  * 认证服务
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-14
+ * 更新时间：2026-03-16
  */
-import { Injectable, UnauthorizedException, BadRequestException, Inject, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Inject, Logger, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +13,8 @@ import { SysUser } from '../../database/entities/sys-user.entity';
 import { validatePassword } from '../../common/utils/password.util';
 import { RedisCacheService } from '../redis-cache';
 import { MailService } from '../mail';
+import { PermissionService } from '../permission/permission.service';
+import { RoleService } from '../role/role.service';
 
 // Token 黑名单缓存键前缀
 const TOKEN_BLACKLIST_PREFIX = 'token_blacklist';
@@ -22,6 +24,18 @@ const EMAIL_CODE_PREFIX = 'email_code';
 const CODE_EXPIRE_SECONDS = 600; // 10分钟
 // 验证码长度
 const CODE_LENGTH = 6;
+
+// 登录响应接口
+export interface LoginResponse {
+  token: string;
+  user: Partial<SysUser>;
+  role?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  permissions: string[];
+}
 
 @Injectable()
 export class AuthService {
@@ -33,6 +47,10 @@ export class AuthService {
     private jwtService: JwtService,
     private cacheService: RedisCacheService,
     private mailService: MailService,
+    @Inject(forwardRef(() => PermissionService))
+    private permissionService: PermissionService,
+    @Inject(forwardRef(() => RoleService))
+    private roleService: RoleService,
   ) {}
 
   /**
@@ -47,7 +65,7 @@ export class AuthService {
     account: string,
     password: string,
     ip: string,
-  ): Promise<{ token: string; user: Partial<SysUser> }> {
+  ): Promise<LoginResponse> {
     // 判断是邮箱还是用户名
     const isEmail = account.includes('@');
     
@@ -87,11 +105,30 @@ export class AuthService {
     };
     const token = this.jwtService.sign(payload);
 
+    // 获取用户角色和权限
+    let role: { id: string; code: string; name: string } | null = null;
+    let permissions: string[] = [];
+
+    if (user.roleId) {
+      const roleEntity = await this.roleService.findById(user.roleId);
+      if (roleEntity) {
+        role = {
+          id: roleEntity.id,
+          code: roleEntity.code,
+          name: roleEntity.name,
+        };
+        // 获取权限编码列表
+        permissions = await this.permissionService.getPermissionCodesByRoleId(user.roleId);
+      }
+    }
+
     // 返回用户信息（不包含密码）
     const { password: _, ...userInfo } = user;
     return {
       token,
       user: userInfo,
+      role,
+      permissions,
     };
   }
 
@@ -148,9 +185,9 @@ export class AuthService {
   /**
    * 获取用户信息
    * @param userId 用户ID
-   * @returns 用户信息
+   * @returns 用户信息（包含角色和权限）
    */
-  async getUserInfo(userId: string): Promise<Partial<SysUser>> {
+  async getUserInfo(userId: string): Promise<Partial<SysUser> & { role?: any; permissions?: string[] }> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -158,7 +195,28 @@ export class AuthService {
       return null;
     }
     const { password: _, ...userInfo } = user;
-    return userInfo;
+
+    // 获取用户角色和权限
+    let role: any = null;
+    let permissions: string[] = [];
+
+    if (user.roleId) {
+      const roleEntity = await this.roleService.findById(user.roleId);
+      if (roleEntity) {
+        role = {
+          id: roleEntity.id,
+          code: roleEntity.code,
+          name: roleEntity.name,
+        };
+        permissions = await this.permissionService.getPermissionCodesByRoleId(user.roleId);
+      }
+    }
+
+    return {
+      ...userInfo,
+      role,
+      permissions,
+    };
   }
 
   /**
@@ -274,7 +332,7 @@ export class AuthService {
     email: string,
     code: string,
     ip: string,
-  ): Promise<{ token: string; user: Partial<SysUser> }> {
+  ): Promise<LoginResponse> {
     // 验证验证码
     const cacheKey = RedisCacheService.buildKey(EMAIL_CODE_PREFIX, email);
     const storedCode = await this.cacheService.get<string>(cacheKey);
@@ -313,11 +371,29 @@ export class AuthService {
     };
     const token = this.jwtService.sign(payload);
 
+    // 获取用户角色和权限
+    let role: { id: string; code: string; name: string } | null = null;
+    let permissions: string[] = [];
+
+    if (user.roleId) {
+      const roleEntity = await this.roleService.findById(user.roleId);
+      if (roleEntity) {
+        role = {
+          id: roleEntity.id,
+          code: roleEntity.code,
+          name: roleEntity.name,
+        };
+        permissions = await this.permissionService.getPermissionCodesByRoleId(user.roleId);
+      }
+    }
+
     // 返回用户信息（不包含密码）
     const { password: _, ...userInfo } = user;
     return {
       token,
       user: userInfo,
+      role,
+      permissions,
     };
   }
 }

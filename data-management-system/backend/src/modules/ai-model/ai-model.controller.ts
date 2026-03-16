@@ -2,7 +2,7 @@
 * AI模型管理控制器
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-13
+* 更新时间：2026-03-16
 */
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
@@ -10,9 +10,11 @@ import { AIModelService } from './ai-model.service';
 import { AIChatService } from './ai-chat.service';
 import { CreateAIModelDto, UpdateAIModelDto, TestConnectionDto, SendMessageDto, GetChatHistoryDto, CreateModelPricingDto, UpdateModelPricingDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @Controller('ai')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class AIModelController {
   constructor(
     private readonly modelService: AIModelService,
@@ -26,6 +28,7 @@ export class AIModelController {
    * GET /api/ai/models
    */
   @Get('models')
+  @RequirePermission('ai:model')
   async findAllModels() {
     const models = await this.modelService.findAll();
     return {
@@ -54,6 +57,7 @@ export class AIModelController {
    * POST /api/ai/models
    */
   @Post('models')
+  @RequirePermission('ai:model')
   async createModel(@Body() dto: CreateAIModelDto) {
     const model = await this.modelService.create(dto);
     return {
@@ -69,6 +73,7 @@ export class AIModelController {
    * 注意：此路由必须在 models/:modelId 相关路由之前定义
    */
   @Post('models/test-connection')
+  @RequirePermission('ai:model')
   async testConnection(@Body() dto: TestConnectionDto) {
     const result = await this.modelService.testConnection(dto);
     return {
@@ -83,6 +88,7 @@ export class AIModelController {
    * GET /api/ai/models/:modelId
    */
   @Get('models/:modelId')
+  @RequirePermission('ai:model')
   async findModelById(@Param('modelId') modelId: string) {
     const model = await this.modelService.findById(modelId);
     return {
@@ -97,6 +103,7 @@ export class AIModelController {
    * PUT /api/ai/models/:modelId
    */
   @Put('models/:modelId')
+  @RequirePermission('ai:model')
   async updateModel(
     @Param('modelId') modelId: string,
     @Body() dto: UpdateAIModelDto,
@@ -114,6 +121,7 @@ export class AIModelController {
    * DELETE /api/ai/models/:modelId
    */
   @Delete('models/:modelId')
+  @RequirePermission('ai:model')
   async deleteModel(@Param('modelId') modelId: string) {
     await this.modelService.delete(modelId);
     return {
@@ -127,6 +135,7 @@ export class AIModelController {
    * POST /api/ai/models/:modelId/toggle
    */
   @Post('models/:modelId/toggle')
+  @RequirePermission('ai:model')
   async toggleModel(@Param('modelId') modelId: string) {
     const model = await this.modelService.toggleEnabled(modelId);
     return {
@@ -141,6 +150,7 @@ export class AIModelController {
    * POST /api/ai/models/:modelId/set-default
    */
   @Post('models/:modelId/set-default')
+  @RequirePermission('ai:model')
   async setDefaultModel(@Param('modelId') modelId: string) {
     const model = await this.modelService.setDefault(modelId);
     return {
@@ -155,6 +165,7 @@ export class AIModelController {
    * POST /api/ai/models/:modelId/test-connection
    */
   @Post('models/:modelId/test-connection')
+  @RequirePermission('ai:model')
   async testConnectionById(@Param('modelId') modelId: string) {
     const result = await this.modelService.testConnectionById(modelId);
     return {
@@ -171,6 +182,7 @@ export class AIModelController {
    * POST /api/ai/chat/send
    */
   @Post('chat/send')
+  @RequirePermission('ai:chat')
   async sendMessage(@Body() dto: SendMessageDto, @Req() req: any) {
     // 获取当前登录用户ID
     const userId = req.user?.id;
@@ -189,6 +201,7 @@ export class AIModelController {
    * 注意：@Sse 装饰器只支持 GET 请求，需要手动处理 POST 的 SSE 响应
    */
   @Post('chat/stream')
+  @RequirePermission('ai:chat')
   async streamChat(
     @Body() dto: SendMessageDto,
     @Req() req: Request,
@@ -233,6 +246,7 @@ export class AIModelController {
    * GET /api/ai/chat/history
    */
   @Get('chat/history')
+  @RequirePermission('ai:chat')
   async getChatHistory(@Query() dto: GetChatHistoryDto, @Req() req: any) {
     // 获取当前登录用户ID，只显示该用户的对话
     const userId = req.user?.id;
@@ -249,6 +263,7 @@ export class AIModelController {
    * GET /api/ai/chat/sessions
    */
   @Get('chat/sessions')
+  @RequirePermission('ai:chat')
   async getSessionList(@Req() req: any) {
     // 获取当前登录用户ID，只显示该用户的会话
     const userId = req.user?.id;
@@ -265,6 +280,7 @@ export class AIModelController {
    * DELETE /api/ai/chat/sessions/:sessionId
    */
   @Delete('chat/sessions/:sessionId')
+  @RequirePermission('ai:chat')
   async deleteSession(@Param('sessionId') sessionId: string, @Req() req: any) {
     // 获取当前登录用户ID，确保只能删除自己的会话
     const userId = req.user?.id;
@@ -282,6 +298,7 @@ export class AIModelController {
    * GET /api/ai/pricing
    */
   @Get('pricing')
+  @RequirePermission('ai:model')
   async getAllPricing() {
     const pricingList = await this.modelService.getAllPricing();
     return {
@@ -296,6 +313,7 @@ export class AIModelController {
    * GET /api/ai/models/:modelId/pricing
    */
   @Get('models/:modelId/pricing')
+  @RequirePermission('ai:model')
   async getModelPricing(@Param('modelId') modelId: string) {
     const pricing = await this.modelService.getPricing(modelId);
     return {
@@ -310,6 +328,7 @@ export class AIModelController {
    * POST /api/ai/models/:modelId/pricing
    */
   @Post('models/:modelId/pricing')
+  @RequirePermission('ai:model')
   async setModelPricing(
     @Param('modelId') modelId: string,
     @Body() dto: CreateModelPricingDto,
@@ -327,6 +346,7 @@ export class AIModelController {
    * PUT /api/ai/pricing/:pricingId
    */
   @Put('pricing/:pricingId')
+  @RequirePermission('ai:model')
   async updatePricing(
     @Param('pricingId') pricingId: string,
     @Body() dto: UpdateModelPricingDto,

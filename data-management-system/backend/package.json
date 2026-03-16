@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:init": "npx tsx src/database/init-db.ts",
     "db:init-admin": "npx tsx src/database/init-admin.ts",
-    "db:migrate": "npx tsx src/database/migrate-add-operator.ts"
+    "db:migrate": "npx tsx src/database/migrate-add-operator.ts",
+    "db:init-permission": "npx tsx src/database/init-permission.ts"
   },
   "dependencies": {
     "@langchain/openai": "^0.0.19",

@@ -2,14 +2,16 @@
  * 用户管理控制器
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-13
+ * 更新时间：2026-03-16
  */
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @Controller('user')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -18,6 +20,7 @@ export class UserController {
    * GET /api/user
    */
   @Get()
+  @RequirePermission('user:view')
   async findAll(
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -44,6 +47,7 @@ export class UserController {
    * GET /api/user/:id
    */
   @Get(':id')
+  @RequirePermission('user:view')
   async findOne(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     return {
@@ -58,6 +62,7 @@ export class UserController {
    * POST /api/user
    */
   @Post()
+  @RequirePermission('user:create')
   async create(
     @Body() body: {
       username: string;
@@ -66,6 +71,7 @@ export class UserController {
       nickname?: string;
       avatar?: string;
       status?: number;
+      roleId?: string;
     },
     @Req() req: any,
   ) {
@@ -82,6 +88,7 @@ export class UserController {
    * PUT /api/user/:id
    */
   @Put(':id')
+  @RequirePermission('user:edit')
   async update(
     @Param('id') id: string,
     @Body() body: {
@@ -90,6 +97,7 @@ export class UserController {
       avatar?: string;
       status?: number;
       password?: string;
+      roleId?: string;
     },
     @Req() req: any,
   ) {
@@ -106,6 +114,7 @@ export class UserController {
    * DELETE /api/user/:id
    */
   @Delete(':id')
+  @RequirePermission('user:delete')
   async remove(@Param('id') id: string) {
     await this.userService.remove(id);
     return {
@@ -119,6 +128,7 @@ export class UserController {
    * POST /api/user/:id/reset-password
    */
   @Post(':id/reset-password')
+  @RequirePermission('user:edit')
   async resetPassword(
     @Param('id') id: string,
     @Body() body: { password: string },
@@ -136,6 +146,7 @@ export class UserController {
    * POST /api/user/:id/toggle-status
    */
   @Post(':id/toggle-status')
+  @RequirePermission('user:edit')
   async toggleStatus(
     @Param('id') id: string,
     @Req() req: any,

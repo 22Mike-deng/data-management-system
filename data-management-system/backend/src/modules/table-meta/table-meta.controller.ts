@@ -2,13 +2,17 @@
  * 数据表元数据控制器
  * 创建者：dzh
  * 创建时间：2026-03-11
- * 更新时间：2026-03-11
+ * 更新时间：2026-03-16
  */
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { TableMetaService } from './table-meta.service';
 import { CreateTableDto, UpdateTableDto, CreateFieldDto, UpdateFieldDto } from './dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @Controller('table-meta')
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class TableMetaController {
   constructor(private readonly tableMetaService: TableMetaService) {}
 
@@ -17,6 +21,7 @@ export class TableMetaController {
    * GET /api/table-meta
    */
   @Get()
+  @RequirePermission('table:view')
   async findAllTables() {
     const tables = await this.tableMetaService.findAllTables();
     return {
@@ -31,6 +36,7 @@ export class TableMetaController {
    * GET /api/table-meta/:tableId
    */
   @Get(':tableId')
+  @RequirePermission('table:view')
   async findTableById(@Param('tableId') tableId: string) {
     const table = await this.tableMetaService.findTableById(tableId);
     return {
@@ -45,6 +51,7 @@ export class TableMetaController {
    * POST /api/table-meta
    */
   @Post()
+  @RequirePermission('table:create')
   async createTable(@Body() dto: CreateTableDto) {
     const table = await this.tableMetaService.createTable(dto);
     return {
@@ -59,6 +66,7 @@ export class TableMetaController {
    * PUT /api/table-meta/:tableId
    */
   @Put(':tableId')
+  @RequirePermission('table:edit')
   async updateTable(
     @Param('tableId') tableId: string,
     @Body() dto: UpdateTableDto,
@@ -76,6 +84,7 @@ export class TableMetaController {
    * DELETE /api/table-meta/:tableId
    */
   @Delete(':tableId')
+  @RequirePermission('table:delete')
   async deleteTable(@Param('tableId') tableId: string) {
     await this.tableMetaService.deleteTable(tableId);
     return {
@@ -89,6 +98,7 @@ export class TableMetaController {
    * GET /api/table-meta/:tableId/fields
    */
   @Get(':tableId/fields')
+  @RequirePermission('table:view')
   async getTableFields(@Param('tableId') tableId: string) {
     const fields = await this.tableMetaService.getTableFields(tableId);
     return {
@@ -103,6 +113,7 @@ export class TableMetaController {
    * POST /api/table-meta/:tableId/fields
    */
   @Post(':tableId/fields')
+  @RequirePermission('table:edit')
   async addField(
     @Param('tableId') tableId: string,
     @Body() dto: CreateFieldDto,
@@ -120,6 +131,7 @@ export class TableMetaController {
    * PUT /api/table-meta/fields/:fieldId
    */
   @Put('fields/:fieldId')
+  @RequirePermission('table:edit')
   async updateField(
     @Param('fieldId') fieldId: string,
     @Body() dto: UpdateFieldDto,
@@ -137,6 +149,7 @@ export class TableMetaController {
    * DELETE /api/table-meta/fields/:fieldId
    */
   @Delete('fields/:fieldId')
+  @RequirePermission('table:edit')
   async deleteField(@Param('fieldId') fieldId: string) {
     await this.tableMetaService.deleteField(fieldId);
     return {

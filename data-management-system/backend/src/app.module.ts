@@ -2,7 +2,7 @@
 * NestJS 根模块
 * 创建者：dzh
 * 创建时间：2026-03-11
-* 更新时间：2026-03-14
+* 更新时间：2026-03-16
 */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -23,6 +23,8 @@ import { UserModule } from './modules/user';
 import { MailModule } from './modules/mail';
 import { AuditLogModule } from './modules/audit-log';
 import { DataImportExportModule } from './modules/data-import-export';
+import { PermissionModule } from './modules/permission';
+import { RoleModule } from './modules/role';
 
 @Module({
   imports: [
@@ -98,6 +100,8 @@ import { DataImportExportModule } from './modules/data-import-export';
     KnowledgeBaseModule,
     AuditLogModule,
     DataImportExportModule,
+    PermissionModule,
+    RoleModule,
   ],
   controllers: [AppController],
   providers: [

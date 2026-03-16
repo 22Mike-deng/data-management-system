@@ -90,11 +90,15 @@ export class AIChatService {
     // 解析思考步骤（优先使用原生 thinking，其次解析标签）
     let thinking = nativeThinking;
     let finalContent = reply;
-    if (!thinking) {
-      const parsed = this.parseThinking(reply);
+    
+    // 无论是否有原生 thinking，都要解析 content 中的 thinking 标签
+    const parsed = this.parseThinking(reply);
+    if (parsed.thinking && !thinking) {
+      // 如果没有原生 thinking，使用解析出的 thinking
       thinking = parsed.thinking;
-      finalContent = parsed.content;
     }
+    // 总是使用清理后的 content（移除 thinking 标签）
+    finalContent = parsed.content;
 
     // 保存AI回复（包含思考步骤，添加创建者ID）
     const assistantMessage = this.chatRepository.create({

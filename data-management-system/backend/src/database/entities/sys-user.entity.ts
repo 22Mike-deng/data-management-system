@@ -2,7 +2,7 @@
  * 系统用户实体
  * 创建者：dzh
  * 创建时间：2026-03-13
- * 更新时间：2026-03-14
+ * 更新时间：2026-03-16
  */
 import {
   Entity,
@@ -11,7 +11,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   VersionColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { SysRole } from './sys-role.entity';
 
 @Entity('sys_user')
 export class SysUser {
@@ -38,6 +41,10 @@ export class SysUser {
   // 头像
   @Column({ type: 'varchar', length: 500, nullable: true })
   avatar: string;
+
+  // 角色ID
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  roleId: string;
 
   // 状态：0-正常，1-禁用
   @Column({ type: 'tinyint', default: 0 })
@@ -70,4 +77,9 @@ export class SysUser {
   // 更新时间
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // 关联角色
+  @ManyToOne(() => SysRole, (role) => role.users)
+  @JoinColumn({ name: 'roleId' })
+  role: SysRole;
 }

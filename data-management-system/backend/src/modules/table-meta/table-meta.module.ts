@@ -9,9 +9,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TableDefinition, FieldDefinition } from '@/database/entities';
 import { TableMetaService } from './table-meta.service';
 import { TableMetaController } from './table-meta.controller';
+import { PermissionModule } from '../permission/permission.module';
+import { RoleModule } from '../role/role.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TableDefinition, FieldDefinition])],
+  imports: [
+    TypeOrmModule.forFeature([TableDefinition, FieldDefinition]),
+    PermissionModule,
+    RoleModule,
+  ],
   controllers: [TableMetaController],
   providers: [TableMetaService],
   exports: [TableMetaService],
